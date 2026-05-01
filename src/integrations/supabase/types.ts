@@ -14,7 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      outfits: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          occasion: string
+          rationale: string | null
+          saved: boolean
+          score_breakdown: Json | null
+          share_slug: string
+          style_score: number | null
+          suggestions: Json | null
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items: Json
+          occasion: string
+          rationale?: string | null
+          saved?: boolean
+          score_breakdown?: Json | null
+          share_slug?: string
+          style_score?: number | null
+          suggestions?: Json | null
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          occasion?: string
+          rationale?: string | null
+          saved?: boolean
+          score_breakdown?: Json | null
+          share_slug?: string
+          style_score?: number | null
+          suggestions?: Json | null
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          ai_analysis: Json | null
+          body_photo_path: string | null
+          body_shape: string | null
+          created_at: string
+          display_name: string | null
+          face_photo_path: string | null
+          gender: string | null
+          hair_type: string | null
+          height_cm: number | null
+          id: string
+          onboarded: boolean
+          skin_tone: string | null
+          style_prefs: string[] | null
+          updated_at: string
+          weight_kg: number | null
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          body_photo_path?: string | null
+          body_shape?: string | null
+          created_at?: string
+          display_name?: string | null
+          face_photo_path?: string | null
+          gender?: string | null
+          hair_type?: string | null
+          height_cm?: number | null
+          id: string
+          onboarded?: boolean
+          skin_tone?: string | null
+          style_prefs?: string[] | null
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Update: {
+          ai_analysis?: Json | null
+          body_photo_path?: string | null
+          body_shape?: string | null
+          created_at?: string
+          display_name?: string | null
+          face_photo_path?: string | null
+          gender?: string | null
+          hair_type?: string | null
+          height_cm?: number | null
+          id?: string
+          onboarded?: boolean
+          skin_tone?: string | null
+          style_prefs?: string[] | null
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
