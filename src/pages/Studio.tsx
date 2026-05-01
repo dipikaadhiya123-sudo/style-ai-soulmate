@@ -51,8 +51,9 @@ export default function Studio() {
       const path = `${user.id}/${kind}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("user-photos").upload(path, file, { upsert: true });
       if (upErr) throw upErr;
+      const update = kind === "face" ? { face_photo_path: path } : { body_photo_path: path };
       const field = kind === "face" ? "face_photo_path" : "body_photo_path";
-      const { error } = await supabase.from("profiles").update({ [field]: path }).eq("id", user.id);
+      const { error } = await supabase.from("profiles").update(update).eq("id", user.id);
       if (error) throw error;
       const { data: signed } = await supabase.storage.from("user-photos").createSignedUrl(path, 3600);
       if (kind === "face") setFaceUrl(signed?.signedUrl ?? null);
