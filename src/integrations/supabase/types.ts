@@ -38,6 +38,48 @@ export type Database = {
         }
         Relationships: []
       }
+      looks: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          highlights: Json | null
+          id: string
+          item_image_url: string | null
+          item_label: string
+          photo_path: string
+          saved: boolean
+          share_slug: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          highlights?: Json | null
+          id?: string
+          item_image_url?: string | null
+          item_label: string
+          photo_path: string
+          saved?: boolean
+          share_slug?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          highlights?: Json | null
+          id?: string
+          item_image_url?: string | null
+          item_label?: string
+          photo_path?: string
+          saved?: boolean
+          share_slug?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       outfits: {
         Row: {
           created_at: string

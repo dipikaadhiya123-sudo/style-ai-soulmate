@@ -15,6 +15,7 @@ import Lookbook from "./pages/Lookbook";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import SharedOutfit from "./pages/SharedOutfit";
+import SharedLook from "./pages/SharedLook";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/AppLayout";
 
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/outfit/:slug" element={<SharedOutfit />} />
+          <Route path="/look/:slug" element={<SharedLook />} />
           <Route element={<AppLayout />}>
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/studio" element={<Studio />} />
