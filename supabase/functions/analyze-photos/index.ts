@@ -39,7 +39,12 @@ Deno.serve(async (req) => {
       if (signed?.signedUrl) {
         const r = await fetch(signed.signedUrl);
         const buf = new Uint8Array(await r.arrayBuffer());
-        const b64 = btoa(String.fromCharCode(...buf));
+        let bin = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < buf.length; i += chunk) {
+          bin += String.fromCharCode(...buf.subarray(i, i + chunk));
+        }
+        const b64 = btoa(bin);
         const mime = r.headers.get("content-type") || "image/jpeg";
         imageContents.push({ type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } });
       }
