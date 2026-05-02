@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Studio from "./pages/Studio";
 import Stylist from "./pages/Stylist";
+import TryOn from "./pages/TryOn";
 import Lookbook from "./pages/Lookbook";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/studio" element={<Studio />} />
             <Route path="/stylist" element={<Stylist />} />
+            <Route path="/tryon" element={<TryOn />} />
             <Route path="/lookbook" element={<Lookbook />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/profile" element={<Profile />} />
