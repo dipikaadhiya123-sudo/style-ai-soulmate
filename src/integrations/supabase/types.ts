@@ -48,6 +48,7 @@ export type Database = {
           item_image_url: string | null
           item_label: string
           photo_path: string
+          result_image_path: string | null
           saved: boolean
           share_slug: string
           user_id: string
@@ -61,6 +62,7 @@ export type Database = {
           item_image_url?: string | null
           item_label: string
           photo_path: string
+          result_image_path?: string | null
           saved?: boolean
           share_slug?: string
           user_id: string
@@ -74,6 +76,7 @@ export type Database = {
           item_image_url?: string | null
           item_label?: string
           photo_path?: string
+          result_image_path?: string | null
           saved?: boolean
           share_slug?: string
           user_id?: string
