@@ -8,6 +8,7 @@ export default function SharedLook() {
   const { slug } = useParams();
   const [look, setLook] = useState<any>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,7 +16,7 @@ export default function SharedLook() {
     (async () => {
       const { data } = await supabase
         .from("looks")
-        .select("photo_path, item_label, category, description, highlights")
+        .select("photo_path, item_label, category, description, highlights, result_image_path")
         .eq("share_slug", slug)
         .eq("saved", true)
         .maybeSingle();
@@ -25,6 +26,12 @@ export default function SharedLook() {
           .from("tryon-photos")
           .createSignedUrl(data.photo_path, 3600);
         setPhotoUrl(signed?.signedUrl ?? null);
+        if (data.result_image_path) {
+          const { data: r } = await supabase.storage
+            .from("tryon-results")
+            .createSignedUrl(data.result_image_path, 3600);
+          setResultUrl(r?.signedUrl ?? null);
+        }
       }
       setLoading(false);
     })();
@@ -63,7 +70,7 @@ export default function SharedLook() {
         <div className="text-xs uppercase tracking-wider text-muted-foreground">{look.category}</div>
         <h1 className="font-display text-3xl md:text-4xl font-medium mb-6">{look.item_label}</h1>
 
-        <BeforeAfter photoUrl={photoUrl} description={look.description} itemLabel={look.item_label} />
+        <BeforeAfter beforeUrl={photoUrl} afterUrl={resultUrl} description={look.description} itemLabel={look.item_label} />
 
         {look.highlights?.length > 0 && (
           <div className="mt-6 grid sm:grid-cols-2 gap-3">
