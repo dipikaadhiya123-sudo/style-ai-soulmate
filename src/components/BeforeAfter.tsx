@@ -1,12 +1,13 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
 type Props = {
-  photoUrl: string;
-  description: string;
-  itemLabel: string;
+  beforeUrl: string;
+  afterUrl?: string | null;
+  description?: string;
+  itemLabel?: string;
 };
 
-export default function BeforeAfter({ photoUrl, description, itemLabel }: Props) {
+export default function BeforeAfter({ beforeUrl, afterUrl, description, itemLabel }: Props) {
   const [pos, setPos] = useState(50);
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -21,7 +22,7 @@ export default function BeforeAfter({ photoUrl, description, itemLabel }: Props)
   useEffect(() => {
     const onMove = (e: MouseEvent | TouchEvent) => {
       if (!dragging.current) return;
-      const x = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const x = "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
       move(x);
     };
     const stop = () => (dragging.current = false);
@@ -42,21 +43,25 @@ export default function BeforeAfter({ photoUrl, description, itemLabel }: Props)
       ref={ref}
       className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden border border-border bg-background select-none touch-none"
     >
-      {/* Before (full photo) */}
-      <img src={photoUrl} alt="Before" className="absolute inset-0 w-full h-full object-cover" />
+      <img src={beforeUrl} alt="Before" className="absolute inset-0 w-full h-full object-cover" />
 
-      {/* After (clipped right side) */}
       <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 0 0 ${pos}%)` }}>
-        <img src={photoUrl} alt="After base" className="absolute inset-0 w-full h-full object-cover blur-[2px] brightness-110" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/40 to-background/10" />
-        <div className="absolute inset-0 flex flex-col justify-end p-5 md:p-7 text-foreground">
-          <div className="text-[10px] uppercase tracking-widest text-accent mb-1">Imagined look</div>
-          <div className="font-display text-lg md:text-xl font-medium leading-tight mb-2">{itemLabel}</div>
-          <p className="text-xs md:text-sm text-foreground/90 line-clamp-5 md:line-clamp-6">{description}</p>
-        </div>
+        {afterUrl ? (
+          <img src={afterUrl} alt="After" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <>
+            <img src={beforeUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-[2px] brightness-110" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/40 to-background/10" />
+            {(description || itemLabel) && (
+              <div className="absolute inset-0 flex flex-col justify-end p-5 md:p-7 text-foreground">
+                {itemLabel && <div className="font-display text-lg md:text-xl font-medium leading-tight mb-2">{itemLabel}</div>}
+                {description && <p className="text-xs md:text-sm text-foreground/90 line-clamp-5">{description}</p>}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Labels */}
       <div className="absolute top-3 left-3 bg-background/80 backdrop-blur rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-wider">
         Before
       </div>
@@ -64,7 +69,6 @@ export default function BeforeAfter({ photoUrl, description, itemLabel }: Props)
         After
       </div>
 
-      {/* Slider handle */}
       <div className="absolute inset-y-0 -ml-px" style={{ left: `${pos}%` }}>
         <div className="w-px h-full bg-foreground/80" />
         <button

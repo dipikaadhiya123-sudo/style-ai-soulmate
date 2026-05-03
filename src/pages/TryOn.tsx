@@ -1,6 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, Image as ImageIcon, Link2, Sparkles, Shirt, Footprints, Watch, X, Upload, Loader2, Save, Share2 } from "lucide-react";
+import {
+  Camera, Image as ImageIcon, Link2, Sparkles, Shirt, Footprints, Watch,
+  X, Upload, Loader2, Save, Share2, Search, Download,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,71 +20,111 @@ const categories: { id: Category; label: string; icon: any }[] = [
   { id: "accessories", label: "Accessories", icon: Watch },
 ];
 
-type LookResult = {
-  description: string;
-  highlights: { label: string; detail: string }[];
-};
+type ProductHit = { id: string; title: string; thumbnail: string; url: string };
 
 export default function TryOn() {
   const { user } = useAuth();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null);
-  const [itemImageFile, setItemImageFile] = useState<File | null>(null);
-  const [itemImageObjectUrl, setItemImageObjectUrl] = useState<string | null>(null);
+  const [itemPreview, setItemPreview] = useState<string | null>(null);
   const [itemLabel, setItemLabel] = useState("");
   const [category, setCategory] = useState<Category>("clothes");
   const [urlInput, setUrlInput] = useState("");
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [hits, setHits] = useState<ProductHit[]>([]);
+
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [look, setLook] = useState<LookResult | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultPath, setResultPath] = useState<string | null>(null);
+  const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
 
   const photoInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const itemInput = useRef<HTMLInputElement>(null);
 
+  useEffect(() => () => {
+    if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
+  }, [photoPreview]);
+
   const onPhoto = (file: File) => {
     setPhotoFile(file);
-    setPhotoUrl(URL.createObjectURL(file));
-    setLook(null);
-    setSavedSlug(null);
+    setPhotoPreview(URL.createObjectURL(file));
+    resetResult();
   };
 
-  const onItemFile = (file: File) => {
-    setItemImageFile(file);
-    setItemImageObjectUrl(URL.createObjectURL(file));
-    setItemImageUrl(null);
-    setLook(null);
-    setSavedSlug(null);
+  const onItemFile = async (file: File) => {
+    // Convert to data URL so the edge function can fetch it
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = reader.result as string;
+      setItemImageUrl(url);
+      setItemPreview(url);
+      resetResult();
+    };
+    reader.readAsDataURL(file);
   };
 
   const loadFromUrl = () => {
     if (!urlInput.trim()) return;
     setItemImageUrl(urlInput.trim());
-    setItemImageObjectUrl(urlInput.trim());
-    setItemImageFile(null);
+    setItemPreview(urlInput.trim());
     setUrlInput("");
-    setLook(null);
+    resetResult();
+  };
+
+  const resetResult = () => {
+    setResultUrl(null);
+    setResultPath(null);
     setSavedSlug(null);
+  };
+
+  const runSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("search-products", {
+        body: { query: searchQuery.trim(), category },
+      });
+      if (error) throw error;
+      setHits(data?.results ?? []);
+      if (!data?.results?.length) toast.info("No products found — try different keywords");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pickHit = (h: ProductHit) => {
+    setItemImageUrl(h.thumbnail);
+    setItemPreview(h.thumbnail);
+    if (!itemLabel) setItemLabel(h.title.slice(0, 80));
+    resetResult();
   };
 
   const generate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add a photo of yourself.");
-    if (!itemLabel.trim()) return toast.error("Describe the item (e.g. 'black leather ankle boots').");
+    if (!itemLabel.trim()) return toast.error("Describe the item or pick one from search.");
 
     setGenerating(true);
+    resetResult();
     try {
-      // Upload photo to private bucket
-      const ext = photoFile.name.split(".").pop() || "jpg";
+      const ext = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `${user.id}/tryon-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("tryon-photos")
-        .upload(path, photoFile, { upsert: true });
+        .upload(path, photoFile, { upsert: true, contentType: photoFile.type || "image/jpeg" });
       if (upErr) throw upErr;
+      setPhotoPath(path);
 
-      const { data, error } = await supabase.functions.invoke("describe-look", {
+      const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: {
           photoPath: path,
           itemLabel: itemLabel.trim(),
@@ -92,10 +135,9 @@ export default function TryOn() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      setLook({ description: data.description, highlights: data.highlights ?? [] });
-      // Stash the path on a hidden field via state
-      (window as any).__tryonPath = path;
-      toast.success("Look generated");
+      setResultUrl(data.resultUrl);
+      setResultPath(data.resultPath);
+      toast.success("Try-on rendered");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate");
     } finally {
@@ -104,21 +146,20 @@ export default function TryOn() {
   };
 
   const save = async () => {
-    if (!user || !look) return;
-    const path = (window as any).__tryonPath;
-    if (!path) return;
+    if (!user || !resultPath || !photoPath) return;
     setSaving(true);
     try {
       const { data, error } = await supabase
         .from("looks")
         .insert({
           user_id: user.id,
-          photo_path: path,
+          photo_path: photoPath,
           item_image_url: itemImageUrl,
           item_label: itemLabel.trim(),
           category,
-          description: look.description,
-          highlights: look.highlights,
+          description: `AI-rendered ${category}: ${itemLabel.trim()}`,
+          highlights: [],
+          result_image_path: resultPath,
         })
         .select("share_slug")
         .single();
@@ -149,8 +190,8 @@ export default function TryOn() {
           <Sparkles className="w-3.5 h-3.5" /> Beta
         </div>
         <h1 className="font-display text-4xl md:text-5xl font-medium mb-2 text-balance">Virtual Try-On</h1>
-        <p className="text-muted-foreground mb-10 max-w-xl">
-          Upload your photo and an item. We'll describe how the look would come together — no garment rendering, just a visual before/after with the AI's styling read.
+        <p className="text-muted-foreground mb-8 max-w-xl">
+          Upload your photo, pick a product, and we'll render an AI try-on you can compare side by side.
         </p>
       </motion.div>
 
@@ -183,13 +224,13 @@ export default function TryOn() {
         <div className="rounded-2xl border border-border bg-gradient-card p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-medium">Your photo</div>
-            {photoUrl && (
-              <button onClick={() => { setPhotoUrl(null); setPhotoFile(null); setLook(null); setSavedSlug(null); }} className="text-muted-foreground hover:text-foreground">
+            {photoPreview && (
+              <button onClick={() => { setPhotoPreview(null); setPhotoFile(null); resetResult(); }} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          <PreviewBox url={photoUrl} placeholder="Full-body or portrait" />
+          <PreviewBox url={photoPreview} placeholder="Full-body or portrait" />
           <div className="grid grid-cols-2 gap-2 mt-3">
             <Button variant="outline" onClick={() => photoInput.current?.click()}>
               <ImageIcon className="w-4 h-4" /> Gallery
@@ -206,13 +247,13 @@ export default function TryOn() {
         <div className="rounded-2xl border border-border bg-gradient-card p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-medium">Item</div>
-            {itemImageObjectUrl && (
-              <button onClick={() => { setItemImageObjectUrl(null); setItemImageFile(null); setItemImageUrl(null); }} className="text-muted-foreground hover:text-foreground">
+            {itemPreview && (
+              <button onClick={() => { setItemPreview(null); setItemImageUrl(null); resetResult(); }} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          <PreviewBox url={itemImageObjectUrl} placeholder={`Optional ${category.slice(0, -1)} image`} />
+          <PreviewBox url={itemPreview} placeholder={`Optional ${category.slice(0, -1)} image`} />
           <div className="grid grid-cols-2 gap-2 mt-3">
             <Button variant="outline" onClick={() => itemInput.current?.click()}>
               <Upload className="w-4 h-4" /> Upload
@@ -234,30 +275,55 @@ export default function TryOn() {
         </div>
       </div>
 
+      {/* Product image search */}
+      <div className="rounded-2xl border border-border bg-gradient-card p-4 mb-6">
+        <div className="text-sm font-medium mb-3 flex items-center gap-2">
+          <Search className="w-4 h-4" /> Search product images
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && runSearch()}
+            placeholder={`e.g. "black leather ankle boots"`}
+            className="h-10"
+          />
+          <Button onClick={runSearch} disabled={searching} variant="outline">
+            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          </Button>
+        </div>
+        {hits.length > 0 && (
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-4">
+            {hits.map(h => (
+              <button
+                key={h.id}
+                onClick={() => pickHit(h)}
+                className={cn(
+                  "aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                  itemImageUrl === h.thumbnail ? "border-accent" : "border-border hover:border-foreground/40",
+                )}
+                title={h.title}
+              >
+                <img src={h.thumbnail} alt={h.title} className="w-full h-full object-cover" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <Button
         onClick={generate}
         disabled={generating}
         size="lg"
         className="w-full md:w-auto bg-gradient-accent text-accent-foreground border-0 mb-10"
       >
-        {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Try Now</>}
+        {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering...</> : <><Sparkles className="w-4 h-4" /> Try Now</>}
       </Button>
 
-      {look && photoUrl && (
+      {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="font-display text-2xl font-medium mb-4">Before / After</h2>
-          <BeforeAfter photoUrl={photoUrl} description={look.description} itemLabel={itemLabel} />
-
-          {look.highlights.length > 0 && (
-            <div className="grid sm:grid-cols-2 gap-3 mt-5">
-              {look.highlights.map((h, i) => (
-                <div key={i} className="p-4 rounded-xl bg-gradient-card border border-border">
-                  <div className="text-xs uppercase tracking-wider text-accent font-medium mb-1">{h.label}</div>
-                  <div className="text-sm">{h.detail}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          <BeforeAfter beforeUrl={photoPreview} afterUrl={resultUrl} itemLabel={itemLabel} />
 
           <div className="flex flex-wrap gap-2 mt-6">
             {!savedSlug ? (
@@ -269,6 +335,9 @@ export default function TryOn() {
                 <Share2 className="w-4 h-4" /> Share link
               </Button>
             )}
+            <a href={resultUrl} download="tryon.png" target="_blank" rel="noreferrer">
+              <Button variant="outline"><Download className="w-4 h-4" /> Download</Button>
+            </a>
           </div>
         </motion.div>
       )}
