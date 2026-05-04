@@ -12,10 +12,7 @@ export default function SharedOutfit() {
     if (!slug) return;
     (async () => {
       const { data } = await supabase
-        .from("outfits")
-        .select("title, occasion, items, style_score, rationale, suggestions, score_breakdown")
-        .eq("share_slug", slug)
-        .eq("saved", true)
+        .rpc("get_shared_outfit", { _slug: slug })
         .maybeSingle();
       setOutfit(data);
       setLoading(false);

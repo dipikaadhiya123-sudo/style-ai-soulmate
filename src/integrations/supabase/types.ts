@@ -184,10 +184,104 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      shared_looks_public: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          highlights: Json | null
+          item_label: string | null
+          photo_path: string | null
+          result_image_path: string | null
+          share_slug: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          highlights?: Json | null
+          item_label?: string | null
+          photo_path?: string | null
+          result_image_path?: string | null
+          share_slug?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          highlights?: Json | null
+          item_label?: string | null
+          photo_path?: string | null
+          result_image_path?: string | null
+          share_slug?: string | null
+        }
+        Relationships: []
+      }
+      shared_outfits_public: {
+        Row: {
+          created_at: string | null
+          items: Json | null
+          occasion: string | null
+          rationale: string | null
+          score_breakdown: Json | null
+          share_slug: string | null
+          style_score: number | null
+          suggestions: Json | null
+          title: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          items?: Json | null
+          occasion?: string | null
+          rationale?: string | null
+          score_breakdown?: Json | null
+          share_slug?: string | null
+          style_score?: number | null
+          suggestions?: Json | null
+          title?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          items?: Json | null
+          occasion?: string | null
+          rationale?: string | null
+          score_breakdown?: Json | null
+          share_slug?: string | null
+          style_score?: number | null
+          suggestions?: Json | null
+          title?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_shared_look: {
+        Args: { _slug: string }
+        Returns: {
+          category: string
+          created_at: string
+          description: string
+          highlights: Json
+          item_label: string
+          photo_path: string
+          result_image_path: string
+          share_slug: string
+        }[]
+      }
+      get_shared_outfit: {
+        Args: { _slug: string }
+        Returns: {
+          created_at: string
+          items: Json
+          occasion: string
+          rationale: string
+          score_breakdown: Json
+          share_slug: string
+          style_score: number
+          suggestions: Json
+          title: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
