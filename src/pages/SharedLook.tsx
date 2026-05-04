@@ -32,10 +32,7 @@ export default function SharedLook() {
     if (!slug) return;
     (async () => {
       const { data } = await supabase
-        .from("looks")
-        .select("photo_path, item_label, category, description, highlights, result_image_path")
-        .eq("share_slug", slug)
-        .eq("saved", true)
+        .rpc("get_shared_look", { _slug: slug })
         .maybeSingle();
       if (data) {
         setLook(data);
