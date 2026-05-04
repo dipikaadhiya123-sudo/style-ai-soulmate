@@ -370,7 +370,56 @@ export default function TryOn() {
             <a href={resultUrl} download="tryon.png" target="_blank" rel="noreferrer">
               <Button variant="outline"><Download className="w-4 h-4" /> Download</Button>
             </a>
+            <Button onClick={findWhereToBuy} disabled={findingShops} variant="outline">
+              {findingShops ? <><Loader2 className="w-4 h-4 animate-spin" /> Searching...</> : <><ShoppingBag className="w-4 h-4" /> Find where to buy</>}
+            </Button>
           </div>
+
+          {shopResult && (
+            <div className="mt-6 rounded-2xl border border-border bg-gradient-card p-5">
+              <div className="text-sm font-medium mb-1">Identified as</div>
+              <div className="text-base mb-4 text-muted-foreground">{shopResult.primary_query}</div>
+
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Quick search</div>
+              <div className="flex flex-wrap gap-2 mb-5">
+                {shopResult.retailers.map(r => (
+                  <a key={r.name} href={r.url} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline">{r.name} <ExternalLink className="w-3 h-3" /></Button>
+                  </a>
+                ))}
+              </div>
+
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Likely matches</div>
+              <div className="space-y-3">
+                {shopResult.candidates.map((c, i) => (
+                  <div key={i} className="rounded-xl border border-border p-3">
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <div className="font-medium text-sm">{c.title}</div>
+                      {typeof c.confidence === "number" && (
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+                          {Math.round(c.confidence * 100)}% match
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-2">
+                      {[c.color, c.category, c.price_range_usd].filter(Boolean).join(" · ")}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.retailers.slice(0, 5).map(r => (
+                        <a key={r.name} href={r.url} target="_blank" rel="noreferrer"
+                          className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-foreground/40 hover:bg-secondary/60 transition-colors inline-flex items-center gap-1">
+                          {r.name} <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-4">
+                Prices and availability vary — links open the retailer's search for the identified item.
+              </p>
+            </div>
+          )}
         </motion.div>
       )}
     </div>
