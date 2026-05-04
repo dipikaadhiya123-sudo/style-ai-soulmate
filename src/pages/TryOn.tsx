@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Camera, Image as ImageIcon, Link2, Sparkles, Shirt, Footprints, Watch,
-  X, Upload, Loader2, Save, Share2, Search, Download,
+  X, Upload, Loader2, Save, Share2, Search, Download, ShoppingBag, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,18 @@ export default function TryOn() {
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
 
+  const [findingShops, setFindingShops] = useState(false);
+  const [shopResult, setShopResult] = useState<null | {
+    primary_query: string;
+    retailers: { name: string; url: string }[];
+    candidates: {
+      title: string; category?: string; color?: string;
+      features?: string[]; price_range_usd?: string;
+      keywords?: string[]; confidence?: number;
+      retailers: { name: string; url: string }[];
+    }[];
+  }>(null);
+
   const photoInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const itemInput = useRef<HTMLInputElement>(null);
@@ -82,6 +94,26 @@ export default function TryOn() {
     setResultUrl(null);
     setResultPath(null);
     setSavedSlug(null);
+    setShopResult(null);
+  };
+
+  const findWhereToBuy = async () => {
+    const target = resultUrl || itemImageUrl;
+    if (!target) return toast.error("No image to search");
+    setFindingShops(true);
+    setShopResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("reverse-search", {
+        body: { imageUrl: target, category },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setShopResult(data);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Reverse search failed");
+    } finally {
+      setFindingShops(false);
+    }
   };
 
   const runSearch = async () => {
