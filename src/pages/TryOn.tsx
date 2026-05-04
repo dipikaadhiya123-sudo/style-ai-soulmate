@@ -207,7 +207,7 @@ export default function TryOn() {
 
   const share = async () => {
     if (!savedSlug) return;
-    const url = `${window.location.origin}/look/${savedSlug}`;
+    const url = `${window.location.origin}/look/${savedSlug}?shop=1`;
     if (navigator.share) {
       try { await navigator.share({ title: itemLabel, url }); return; } catch {}
     }
