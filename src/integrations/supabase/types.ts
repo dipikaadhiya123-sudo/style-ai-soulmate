@@ -83,6 +83,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          link: string | null
+          read: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       outfits: {
         Row: {
           created_at: string
@@ -179,6 +209,57 @@ export type Database = {
           style_prefs?: string[] | null
           updated_at?: string
           weight_kg?: number | null
+        }
+        Relationships: []
+      }
+      wishlist_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          current_price: number | null
+          id: string
+          image_url: string | null
+          last_checked_at: string | null
+          last_notified_price: number | null
+          retailer: string | null
+          source_url: string
+          target_price: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          current_price?: number | null
+          id?: string
+          image_url?: string | null
+          last_checked_at?: string | null
+          last_notified_price?: number | null
+          retailer?: string | null
+          source_url: string
+          target_price?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          current_price?: number | null
+          id?: string
+          image_url?: string | null
+          last_checked_at?: string | null
+          last_notified_price?: number | null
+          retailer?: string | null
+          source_url?: string
+          target_price?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

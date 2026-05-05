@@ -93,17 +93,28 @@ Deno.serve(async (req) => {
     let parsed: any;
     try { parsed = JSON.parse(args); } catch { return json({ error: "Bad AI output" }, 500); }
 
-    // Build candidate retailer links per match
+    // Build candidate retailer links per match (incl. luxury platforms)
     const retailers = (q: string) => {
       const enc = encodeURIComponent(q);
+      const dash = enc.replace(/%20/g, "-");
       return [
-        { name: "Google Shopping", url: `https://www.google.com/search?tbm=shop&q=${enc}` },
-        { name: "Google Lens",     url: `https://www.google.com/searchbyimage?image_url=${encodeURIComponent(imageUrl)}` },
-        { name: "Amazon",          url: `https://www.amazon.com/s?k=${enc}` },
-        { name: "Myntra",          url: `https://www.myntra.com/${enc.replace(/%20/g, "-")}` },
-        { name: "Flipkart",        url: `https://www.flipkart.com/search?q=${enc}` },
-        { name: "ASOS",            url: `https://www.asos.com/search/?q=${enc}` },
-        { name: "eBay",            url: `https://www.ebay.com/sch/i.html?_nkw=${enc}` },
+        { name: "Google Shopping",   url: `https://www.google.com/search?tbm=shop&q=${enc}` },
+        { name: "Google Lens",       url: `https://www.google.com/searchbyimage?image_url=${encodeURIComponent(imageUrl)}` },
+        { name: "Nykaa Fashion",     url: `https://www.nykaafashion.com/search?q=${enc}` },
+        { name: "Nykaa Luxe",        url: `https://luxe.nykaa.com/search/result?q=${enc}` },
+        { name: "Tata CLiQ Luxury",  url: `https://luxury.tatacliq.com/search/?searchCategory=all&text=${enc}` },
+        { name: "Ajio Luxe",         url: `https://www.ajio.com/s/luxe?query=:relevance:${enc}` },
+        { name: "Darveys",           url: `https://www.darveys.com/search?q=${enc}` },
+        { name: "Aza Fashions",      url: `https://www.azafashions.com/search?q=${enc}` },
+        { name: "Pernia's Pop-Up",   url: `https://www.perniaspopupshop.com/catalogsearch/result/?q=${enc}` },
+        { name: "Net-a-Porter",      url: `https://www.net-a-porter.com/en-in/shop/search/${dash}` },
+        { name: "Farfetch",          url: `https://www.farfetch.com/shopping/search/items.aspx?q=${enc}` },
+        { name: "Mytheresa",         url: `https://www.mytheresa.com/en-in/search?q=${enc}` },
+        { name: "Myntra",            url: `https://www.myntra.com/${dash}` },
+        { name: "Ajio",              url: `https://www.ajio.com/search/?text=${enc}` },
+        { name: "Flipkart",          url: `https://www.flipkart.com/search?q=${enc}` },
+        { name: "Amazon",            url: `https://www.amazon.in/s?k=${enc}` },
+        { name: "ASOS",              url: `https://www.asos.com/search/?q=${enc}` },
       ];
     };
 
