@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
 import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,15 +16,10 @@ const navItems = [
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggle } = useTheme();
 
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth", { replace: true });
-  }, [user, loading, navigate]);
-
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-accent border-t-transparent animate-spin" />
