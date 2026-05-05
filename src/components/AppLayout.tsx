@@ -17,15 +17,10 @@ const navItems = [
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggle } = useTheme();
 
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth", { replace: true });
-  }, [user, loading, navigate]);
-
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-accent border-t-transparent animate-spin" />
