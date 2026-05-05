@@ -16,6 +16,7 @@ import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import SharedOutfit from "./pages/SharedOutfit";
 import SharedLook from "./pages/SharedLook";
+import Wishlist from "./pages/Wishlist";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/AppLayout";
 
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/tryon" element={<TryOn />} />
             <Route path="/lookbook" element={<Lookbook />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="*" element={<NotFound />} />

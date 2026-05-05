@@ -1,9 +1,10 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2 } from "lucide-react";
+import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import NotificationsBell from "@/components/NotificationsBell";
 
 const navItems = [
   { to: "/stylist", label: "Stylist", icon: Sparkles },
@@ -11,6 +12,7 @@ const navItems = [
   { to: "/studio", label: "Studio", icon: Camera },
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/lookbook", label: "Lookbook", icon: BookHeart },
+  { to: "/wishlist", label: "Alerts", icon: Heart },
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 
@@ -51,9 +53,12 @@ export default function AppLayout() {
               </Link>
             ))}
           </nav>
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationsBell />
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
       </header>
 
