@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import BeforeAfter from "@/components/BeforeAfter";
+import AvailabilityPanel from "@/components/AvailabilityPanel";
 
 type ShopResult = {
   primary_query: string;
@@ -168,6 +169,13 @@ export default function SharedLook() {
                 </a>
               ))}
             </div>
+
+            <AvailabilityPanel
+              query={shop.primary_query}
+              category={look.category}
+              retailers={shop.retailers}
+            />
+
 
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Likely matches</div>
             <div className="space-y-3">
