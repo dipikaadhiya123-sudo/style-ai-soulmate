@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import BeforeAfter from "@/components/BeforeAfter";
+import AvailabilityPanel from "@/components/AvailabilityPanel";
 
 type ShopResult = {
   primary_query: string;
