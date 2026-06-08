@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogOut } from "lucide-react";
+import { LogOut, Trash2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -47,6 +52,29 @@ export default function Profile() {
     navigate("/", { replace: true });
   };
 
+  const [wiping, setWiping] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const deletePhotos = async () => {
+    setWiping(true);
+    const { error } = await supabase.functions.invoke("delete-account", { body: { mode: "photos" } });
+    setWiping(false);
+    if (error) return toast.error("Couldn't delete photos");
+    toast.success("All your uploaded photos have been deleted");
+  };
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    const { error } = await supabase.functions.invoke("delete-account", { body: { mode: "account" } });
+    if (error) {
+      setDeleting(false);
+      return toast.error("Couldn't delete account");
+    }
+    await supabase.auth.signOut();
+    toast.success("Your account has been deleted");
+    navigate("/", { replace: true });
+  };
+
   if (!profile) return null;
 
   return (
@@ -70,6 +98,60 @@ export default function Profile() {
         <Button onClick={save} disabled={saving} className="bg-gradient-accent text-accent-foreground border-0 w-full">
           {saving ? "Saving..." : "Save changes"}
         </Button>
+      </div>
+
+      <div className="mt-8 bg-gradient-card border border-border rounded-2xl p-6 shadow-soft">
+        <div className="flex items-center gap-2 mb-1">
+          <ShieldAlert className="w-4 h-4 text-muted-foreground" />
+          <h2 className="font-medium">Privacy & data</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5">
+          Your photos are private — only you can view them. Manage your data below.
+        </p>
+
+        <div className="space-y-3">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-full justify-start" disabled={wiping}>
+                <Trash2 className="w-4 h-4" /> {wiping ? "Deleting…" : "Delete my uploaded photos"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all uploaded photos?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes every photo you've uploaded (profile, try-on, and generated results) from our storage. This can't be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={deletePhotos}>Delete photos</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-destructive hover:text-destructive" disabled={deleting}>
+                <Trash2 className="w-4 h-4" /> {deleting ? "Deleting…" : "Delete my account"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Your account, profile, looks, outfits, wishlist, and all uploaded photos will be permanently deleted. This can't be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={deleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete account
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <Button onClick={signOut} variant="ghost" className="mt-8 text-destructive hover:text-destructive">
