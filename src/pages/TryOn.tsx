@@ -176,7 +176,11 @@ export default function TryOn() {
       // Backfill detected label/category for save metadata
       if (data?.detected?.[0]) {
         if (!itemLabel.trim()) setItemLabel(data.detected[0].label);
-        if (data.detected[0].category) setCategory(data.detected[0].category);
+        const c = data.detected[0].category;
+        if (c === "footwear") setCategory("footwear");
+        else if (["bag","necklace","earrings","ring","bracelet","watch","sunglasses","hat","scarf"].includes(c)) setCategory("accessories");
+        else setCategory("clothes");
+
       }
       toast.success(
         data?.detected?.[0]
