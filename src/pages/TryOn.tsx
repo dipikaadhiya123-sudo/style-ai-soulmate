@@ -143,7 +143,9 @@ export default function TryOn() {
   const generate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add a photo of yourself.");
-    if (!itemLabel.trim()) return toast.error("Describe the item or pick one from search.");
+    if (!itemImageUrl && !itemLabel.trim()) {
+      return toast.error("Upload a product image or describe the item.");
+    }
 
     setGenerating(true);
     resetResult();
@@ -159,9 +161,11 @@ export default function TryOn() {
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: {
           photoPath: path,
-          itemLabel: itemLabel.trim(),
-          category,
-          itemImageUrl: itemImageUrl ?? undefined,
+          items: [{
+            imageUrl: itemImageUrl ?? undefined,
+            label: itemLabel.trim() || undefined,
+            // category omitted — backend auto-detects
+          }],
         },
       });
       if (error) throw error;
@@ -169,13 +173,23 @@ export default function TryOn() {
 
       setResultUrl(data.resultUrl);
       setResultPath(data.resultPath);
-      toast.success("Try-on rendered");
+      // Backfill detected label/category for save metadata
+      if (data?.detected?.[0]) {
+        if (!itemLabel.trim()) setItemLabel(data.detected[0].label);
+        if (data.detected[0].category) setCategory(data.detected[0].category);
+      }
+      toast.success(
+        data?.detected?.[0]
+          ? `Detected: ${data.detected[0].label} (${data.detected[0].category})`
+          : "Try-on rendered"
+      );
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate");
     } finally {
       setGenerating(false);
     }
   };
+
 
   const save = async () => {
     if (!user || !resultPath || !photoPath) return;
