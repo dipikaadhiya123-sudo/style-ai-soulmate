@@ -150,34 +150,85 @@ Deno.serve(async (req) => {
     }
 
     // --- Step 3: Generate ---
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: userContent }],
-        modalities: ["image", "text"],
-      }),
-    });
+    // Use fal.ai FASHN model for single clothing item try-on (much higher fidelity).
+    // Fall back to Gemini for accessories / multi-item / no-image cases.
+    const FAL_KEY = Deno.env.get("FAL_KEY");
+    const singleClothes =
+      enriched.length === 1 &&
+      enriched[0].imageUrl &&
+      ["clothes", "outfit"].includes(enriched[0].category);
 
-    if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
-    if (aiResp.status === 402) return json({ error: "AI credits exhausted — add credits in Settings" }, 402);
-    if (!aiResp.ok) {
-      console.error("AI error", aiResp.status, await aiResp.text());
-      return json({ error: "Image generation failed" }, 500);
+    let mime = "image/png";
+    let ext = "png";
+    let bytes: Uint8Array | null = null;
+
+    if (FAL_KEY && singleClothes) {
+      try {
+        const falResp = await fetch("https://fal.run/fal-ai/fashn/tryon/v1.6", {
+          method: "POST",
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model_image: signed.signedUrl,
+            garment_image: enriched[0].imageUrl,
+            category: "auto",
+            mode: "quality",
+            num_samples: 1,
+          }),
+        });
+        if (!falResp.ok) {
+          console.error("fal error", falResp.status, await falResp.text());
+        } else {
+          const falData = await falResp.json();
+          const outUrl: string | undefined = falData.images?.[0]?.url;
+          if (outUrl) {
+            const imgResp = await fetch(outUrl);
+            if (imgResp.ok) {
+              const ab = await imgResp.arrayBuffer();
+              bytes = new Uint8Array(ab);
+              mime = imgResp.headers.get("content-type") || "image/png";
+              ext = mime.split("/")[1]?.split(";")[0] ?? "png";
+            }
+          }
+        }
+      } catch (e) {
+        console.error("fal call threw", e);
+      }
     }
 
-    const aiData = await aiResp.json();
-    const dataUrl: string | undefined = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!dataUrl?.startsWith("data:image/")) {
-      console.error("No image returned", JSON.stringify(aiData).slice(0, 500));
-      return json({ error: "No image returned" }, 500);
-    }
+    // Fallback / accessory path → Gemini image editing
+    if (!bytes) {
+      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{ role: "user", content: userContent }],
+          modalities: ["image", "text"],
+        }),
+      });
 
-    const [meta, b64] = dataUrl.split(",");
-    const mime = meta.match(/data:(image\/[a-z]+)/)?.[1] ?? "image/png";
-    const ext = mime.split("/")[1] ?? "png";
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
+      if (aiResp.status === 402) return json({ error: "AI credits exhausted — add credits in Settings" }, 402);
+      if (!aiResp.ok) {
+        console.error("AI error", aiResp.status, await aiResp.text());
+        return json({ error: "Image generation failed" }, 500);
+      }
+
+      const aiData = await aiResp.json();
+      const dataUrl: string | undefined = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!dataUrl?.startsWith("data:image/")) {
+        console.error("No image returned", JSON.stringify(aiData).slice(0, 500));
+        return json({ error: "No image returned" }, 500);
+      }
+
+      const [meta, b64] = dataUrl.split(",");
+      mime = meta.match(/data:(image\/[a-z]+)/)?.[1] ?? "image/png";
+      ext = mime.split("/")[1] ?? "png";
+      bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    }
 
     const resultPath = `${userId}/result-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage
