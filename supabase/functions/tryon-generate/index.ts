@@ -29,7 +29,7 @@ const PLACEMENT: Record<Category, string> = {
   clothes:
     "Completely REPLACE the existing upper/lower garment with the reference clothing item. Do not overlay textures on top of old clothes — remove them first, then render the new garment fitted to the body with correct drape and folds.",
   footwear:
-    "Replace ONLY the footwear. Keep legs, ankles, socks-line, ground contact and shadows exactly as before. Match the shoe to foot orientation and perspective.",
+    "CRITICAL: You MUST visibly replace the shoes/sandals/footwear on BOTH feet with the reference footwear. First DELETE the existing footwear completely (do not blend with it), then render the new footwear in its place, matching each foot's exact orientation, angle, and perspective. The new footwear's color, shape, straps, sole, and material MUST clearly match the reference image — the result must look obviously different from the original shoes. Keep the legs, ankles, pants hem, ground surface, and contact shadows exactly as before. Add a realistic contact shadow under each new shoe.",
   bag:
     "Place the bag naturally — on shoulder, in hand, or crossbody depending on the person's pose and free hand. Keep strap physics realistic.",
   necklace:
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
+          model: "google/gemini-3.1-flash-image-preview",
           messages: [{ role: "user", content: userContent }],
           modalities: ["image", "text"],
         }),
