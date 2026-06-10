@@ -31,23 +31,23 @@ const PLACEMENT: Record<Category, string> = {
   footwear:
     "CRITICAL: You MUST visibly replace the shoes/sandals/footwear on BOTH feet with the reference footwear. First DELETE the existing footwear completely (do not blend with it), then render the new footwear in its place, matching each foot's exact orientation, angle, and perspective. The new footwear's color, shape, straps, sole, and material MUST clearly match the reference image — the result must look obviously different from the original shoes. Keep the legs, ankles, pants hem, ground surface, and contact shadows exactly as before. Add a realistic contact shadow under each new shoe.",
   bag:
-    "Place the bag naturally — on shoulder, in hand, or crossbody depending on the person's pose and free hand. Keep strap physics realistic.",
+    "CRITICAL: Add the reference bag to the person — held in hand, on shoulder, or crossbody depending on pose. The bag's exact shape, color, hardware, and material MUST clearly match the reference. Render realistic strap physics and a soft contact shadow. The bag must be clearly visible and obviously added.",
   necklace:
-    "Detect the neck and collarbone. REMOVE any existing necklace, then drape the new necklace around the neck following the body contour with realistic chain physics.",
+    "CRITICAL: REMOVE any existing necklace first, then drape the new necklace around the neck following the collarbone contour. Match the reference's chain style, pendant, color, and length exactly. The necklace must be clearly visible against the skin/clothing with realistic chain physics and tiny shadow.",
   earrings:
-    "Detect both visible ears. Place the earrings symmetrically on the earlobes at correct scale. Remove any existing earrings first.",
+    "CRITICAL: REMOVE any existing earrings first. Place the new earrings on BOTH visible earlobes, symmetrically, at correct scale. Match the reference's shape, color, stones, and dangle length exactly. Earrings must be clearly visible — not hidden behind hair.",
   ring:
-    "Detect the most visible finger (usually ring finger of the visible hand). Fit the ring precisely on the finger with correct scale and perspective.",
+    "CRITICAL: Place the ring on the most visible finger of the visible hand (prefer ring finger). Match the reference's band, stone, color, and metal exactly. The ring must be clearly visible at correct finger-scale with proper perspective and a small shadow on the finger.",
   bracelet:
-    "Detect the visible wrist and fit the bracelet around it with correct curvature and shadow under the wrist.",
+    "CRITICAL: REMOVE any existing bracelet/watch on the visible wrist. Fit the new bracelet around the wrist matching the reference's exact style, color, and material. Render with correct curvature around the wrist and a soft shadow underneath.",
   watch:
-    "Detect the wrist orientation and place the watch on it with the dial facing camera-natural. Match strap to wrist size.",
+    "CRITICAL: REMOVE any existing watch/bracelet on the visible wrist. Place the new watch with dial facing camera-natural. Match the reference's dial, hands, strap color, and material exactly. Strap must wrap the wrist with correct perspective and a shadow underneath.",
   sunglasses:
-    "Detect the eyes and face angle. Align sunglasses on the bridge of the nose, covering the eyes, matching head tilt and perspective. Add subtle lens reflections.",
+    "CRITICAL: REMOVE any existing eyewear. Place the sunglasses on the bridge of the nose, fully covering the eyes, aligned to head tilt and face angle. Match the reference's frame shape, color, and lens tint exactly. Add subtle lens reflections and a soft shadow on the cheeks.",
   hat:
-    "Place the hat/cap on the head following hair volume and head angle. Do not change the hairstyle underneath visible areas.",
+    "CRITICAL: Place the hat/cap on the head following head angle and hair volume. Match the reference's exact shape, color, brim, and logo/details. The hat must clearly sit on the head with a realistic shadow on the forehead — do not just overlay a flat image.",
   scarf:
-    "Drape the scarf or dupatta naturally based on pose — around the neck, over a shoulder, or across the chest — with realistic fabric flow.",
+    "CRITICAL: Drape the scarf/dupatta naturally based on pose — around the neck, over a shoulder, or across the chest. Match the reference's exact color, pattern, and fabric. Render realistic fabric flow, folds, and shadows so it clearly looks worn.",
   outfit:
     "Replace the full outfit (upper + lower) with the reference items, keeping accessories untouched. Render each piece with realistic fit and layering.",
 };
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3.1-flash-image-preview",
+          model: "google/gemini-3-pro-image-preview",
           messages: [{ role: "user", content: userContent }],
           modalities: ["image", "text"],
         }),
