@@ -153,16 +153,25 @@ Deno.serve(async (req) => {
     // Use fal.ai FASHN model for single clothing item try-on (much higher fidelity).
     // Fall back to Gemini for accessories / multi-item / no-image cases.
     const FAL_KEY = Deno.env.get("FAL_KEY");
-    const singleClothes =
-      enriched.length === 1 &&
-      enriched[0].imageUrl &&
-      ["clothes", "outfit"].includes(enriched[0].category);
+    const primary = enriched[0];
+    const isClothes = ["clothes", "outfit"].includes(primary.category);
+    const isFootwear = primary.category === "footwear";
+    // Accessories = everything else (bag, necklace, earrings, ring, bracelet, watch, sunglasses, hat, scarf)
+    const isAccessory = !isClothes && !isFootwear;
+
+    // Per-category model routing:
+    //  - clothes/outfit → fal.ai FASHN (best garment fit)
+    //  - footwear       → Gemini 3 Pro image (best for full shoe replacement)
+    //  - accessories    → Gemini 3.1 Flash image preview / Nano Banana 2 (best targeted edits)
+    const accessoryModel = "google/gemini-3.1-flash-image-preview";
+    const footwearModel = "google/gemini-3-pro-image-preview";
+    const geminiModel = isFootwear ? footwearModel : accessoryModel;
 
     let mime = "image/png";
     let ext = "png";
     let bytes: Uint8Array | null = null;
 
-    if (FAL_KEY && singleClothes) {
+    if (FAL_KEY && isClothes && enriched.length === 1 && primary.imageUrl) {
       try {
         const falResp = await fetch("https://fal.run/fal-ai/fashn/tryon/v1.6", {
           method: "POST",
@@ -172,7 +181,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model_image: signed.signedUrl,
-            garment_image: enriched[0].imageUrl,
+            garment_image: primary.imageUrl,
             category: "auto",
             mode: "quality",
             num_samples: 1,
@@ -198,13 +207,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback / accessory path → Gemini image editing
+    // Fallback / footwear / accessory path → Gemini image editing
     if (!bytes) {
+      console.log("using gemini model", geminiModel, "for category", primary.category);
       const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3-pro-image-preview",
+          model: geminiModel,
           messages: [{ role: "user", content: userContent }],
           modalities: ["image", "text"],
         }),
@@ -229,6 +239,7 @@ Deno.serve(async (req) => {
       ext = mime.split("/")[1] ?? "png";
       bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     }
+
 
     const resultPath = `${userId}/result-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage
