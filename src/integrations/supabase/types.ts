@@ -336,33 +336,7 @@ export type Database = {
       }
     }
     Functions: {
-      get_shared_look: {
-        Args: { _slug: string }
-        Returns: {
-          category: string
-          created_at: string
-          description: string
-          highlights: Json
-          item_label: string
-          photo_path: string
-          result_image_path: string
-          share_slug: string
-        }[]
-      }
-      get_shared_outfit: {
-        Args: { _slug: string }
-        Returns: {
-          created_at: string
-          items: Json
-          occasion: string
-          rationale: string
-          score_breakdown: Json
-          share_slug: string
-          style_score: number
-          suggestions: Json
-          title: string
-        }[]
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
