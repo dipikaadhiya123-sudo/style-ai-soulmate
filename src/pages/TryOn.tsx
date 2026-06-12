@@ -18,6 +18,7 @@ export default function TryOn() {
   const [itemFile, setItemFile] = useState<File | null>(null);
   const [itemDataUrl, setItemDataUrl] = useState<string | null>(null);
   const [itemPreview, setItemPreview] = useState<string | null>(null);
+  const [productUrl, setProductUrl] = useState("");
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
