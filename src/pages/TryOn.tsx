@@ -177,6 +177,17 @@ export default function TryOn() {
         />
       </div>
 
+      <div className="relative mb-6">
+        <Link2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={productUrl}
+          onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
+          placeholder="…or paste a product link (Myntra, Amazon, etc.)"
+          className="pl-9 h-12"
+          inputMode="url"
+        />
+      </div>
+
       <input ref={photoInput} type="file" accept="image/*" className="hidden"
         onChange={e => e.target.files?.[0] && onPhoto(e.target.files[0])} />
       <input ref={cameraInput} type="file" accept="image/*" capture="user" className="hidden"
