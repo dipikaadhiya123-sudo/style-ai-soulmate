@@ -60,8 +60,8 @@ export default function SharedLook() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setShop(data);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't find retailers");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't find retailers");
     } finally {
       setShopLoading(false);
     }
@@ -79,7 +79,12 @@ export default function SharedLook() {
   const shareWithShop = async () => {
     const url = `${window.location.origin}/look/${slug}?shop=1`;
     if (navigator.share) {
-      try { await navigator.share({ title: look?.item_label ?? "My try-on", url }); return; } catch {}
+      try {
+        await navigator.share({ title: look?.item_label ?? "My try-on", url });
+        return;
+      } catch {
+        // Fall back to clipboard.
+      }
     }
     await navigator.clipboard.writeText(url);
     toast.success("Shop link copied");
