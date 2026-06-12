@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import BeforeAfter from "@/components/BeforeAfter";
 import AvailabilityPanel from "@/components/AvailabilityPanel";
 
+type SharedLookData = {
+  share_slug: string;
+  item_label: string;
+  category: string;
+  description: string;
+  highlights: unknown[] | null;
+};
+
 type ShopResult = {
   primary_query: string;
   retailers: { name: string; url: string }[];
@@ -21,7 +29,7 @@ type ShopResult = {
 export default function SharedLook() {
   const { slug } = useParams();
   const [params, setParams] = useSearchParams();
-  const [look, setLook] = useState<any>(null);
+  const [look, setLook] = useState<SharedLookData | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,22 +40,12 @@ export default function SharedLook() {
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      const { data } = await supabase
-        .rpc("get_shared_look", { _slug: slug })
-        .maybeSingle();
-      if (data) {
-        setLook(data);
-        const { data: signed } = await supabase.storage
-          .from("tryon-photos")
-          .createSignedUrl(data.photo_path, 3600);
-        setPhotoUrl(signed?.signedUrl ?? null);
-        if (data.result_image_path) {
-          const { data: r } = await supabase.storage
-            .from("tryon-results")
-            .createSignedUrl(data.result_image_path, 3600);
-          setResultUrl(r?.signedUrl ?? null);
-        }
-      }
+      const { data } = await supabase.functions.invoke("get-shared", {
+        body: { kind: "look", slug },
+      });
+      setLook((data?.look as SharedLookData | null) ?? null);
+      setPhotoUrl(data?.photoUrl ?? null);
+      setResultUrl(data?.resultUrl ?? null);
       setLoading(false);
     })();
   }, [slug]);
@@ -62,8 +60,8 @@ export default function SharedLook() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setShop(data);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't find retailers");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Couldn't find retailers");
     } finally {
       setShopLoading(false);
     }
@@ -81,7 +79,12 @@ export default function SharedLook() {
   const shareWithShop = async () => {
     const url = `${window.location.origin}/look/${slug}?shop=1`;
     if (navigator.share) {
-      try { await navigator.share({ title: look?.item_label ?? "My try-on", url }); return; } catch {}
+      try {
+        await navigator.share({ title: look?.item_label ?? "My try-on", url });
+        return;
+      } catch {
+        // Fall back to clipboard.
+      }
     }
     await navigator.clipboard.writeText(url);
     toast.success("Shop link copied");
@@ -145,7 +148,7 @@ export default function SharedLook() {
 
         {look.highlights?.length > 0 && (
           <div className="mt-6 grid sm:grid-cols-2 gap-3">
-            {(look.highlights as any[]).map((h, i) => (
+            {(look.highlights as { label: string; detail: string }[]).map((h, i) => (
               <div key={i} className="p-4 rounded-xl bg-gradient-card border border-border">
                 <div className="text-xs uppercase tracking-wider text-accent font-medium mb-1">{h.label}</div>
                 <div className="text-sm">{h.detail}</div>

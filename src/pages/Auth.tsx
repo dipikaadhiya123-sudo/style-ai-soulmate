@@ -9,6 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
 
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : fallback;
+
 export default function Auth() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -38,8 +41,8 @@ export default function Auth() {
         if (error) throw error;
         navigate("/stylist", { replace: true });
       }
-    } catch (err: any) {
-      toast.error(err?.message ?? "Something went wrong");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Something went wrong"));
     } finally {
       setLoading(false);
     }
@@ -53,8 +56,8 @@ export default function Auth() {
       });
       if (result.error) throw result.error;
       if (!result.redirected) navigate("/stylist", { replace: true });
-    } catch (err: any) {
-      toast.error(err?.message ?? "Google sign-in failed");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Google sign-in failed"));
       setLoading(false);
     }
   };

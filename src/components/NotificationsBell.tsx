@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -15,31 +15,25 @@ export default function NotificationsBell() {
   const { user } = useAuth();
   const [items, setItems] = useState<N[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!user) return;
     const { data } = await supabase
       .from("notifications").select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false }).limit(20);
     setItems((data ?? []) as N[]);
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user) { setItems([]); return; }
     load();
-    const ch = supabase.channel("notifs")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, payload => {
-        const n = payload.new as N;
-        setItems(prev => [n, ...prev].slice(0, 20));
-        toast(n.title, { description: n.body ?? undefined });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user]);
+  }, [user, load]);
 
   const unread = items.filter(i => !i.read).length;
 
   const markRead = async () => {
     if (unread === 0) return;
-    await supabase.from("notifications").update({ read: true }).eq("read", false);
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user!.id).eq("read", false);
     setItems(prev => prev.map(i => ({ ...i, read: true })));
   };
 
