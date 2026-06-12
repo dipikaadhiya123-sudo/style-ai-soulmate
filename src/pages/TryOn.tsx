@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download } from "lucide-react";
+import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +18,7 @@ export default function TryOn() {
   const [itemFile, setItemFile] = useState<File | null>(null);
   const [itemDataUrl, setItemDataUrl] = useState<string | null>(null);
   const [itemPreview, setItemPreview] = useState<string | null>(null);
+  const [productUrl, setProductUrl] = useState("");
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,6 +53,7 @@ export default function TryOn() {
   const onItem = (file: File) => {
     setItemFile(file);
     setItemPreview(URL.createObjectURL(file));
+    setProductUrl("");
     const reader = new FileReader();
     reader.onload = () => setItemDataUrl(reader.result as string);
     reader.readAsDataURL(file);
@@ -60,7 +63,9 @@ export default function TryOn() {
   const generate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add your photo.");
-    if (!itemDataUrl) return toast.error("Add the product photo.");
+    const url = productUrl.trim();
+    const hasUrl = /^https?:\/\//i.test(url);
+    if (!itemDataUrl && !hasUrl) return toast.error("Add the product photo or paste a link.");
 
     setGenerating(true);
     resetResult();
@@ -73,11 +78,12 @@ export default function TryOn() {
       if (upErr) throw upErr;
       setPhotoPath(path);
 
+      const item: Record<string, string> = {};
+      if (itemDataUrl) item.imageUrl = itemDataUrl;
+      else if (hasUrl) item.productUrl = url;
+
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
-        body: {
-          photoPath: path,
-          items: [{ imageUrl: itemDataUrl }],
-        },
+        body: { photoPath: path, items: [item] },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -137,7 +143,7 @@ export default function TryOn() {
     toast.success("Link copied");
   };
 
-  const canGenerate = !!photoFile && !!itemDataUrl && !generating;
+  const canGenerate = !!photoFile && (!!itemDataUrl || /^https?:\/\//i.test(productUrl.trim())) && !generating;
 
   return (
     <div className="container max-w-3xl py-10">
@@ -168,6 +174,17 @@ export default function TryOn() {
           placeholder="Tap to add"
           onClear={() => { setItemFile(null); setItemPreview(null); setItemDataUrl(null); resetResult(); }}
           onPick={() => itemInput.current?.click()}
+        />
+      </div>
+
+      <div className="relative mb-6">
+        <Link2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={productUrl}
+          onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
+          placeholder="…or paste a product link (Myntra, Amazon, etc.)"
+          className="pl-9 h-12"
+          inputMode="url"
         />
       </div>
 
