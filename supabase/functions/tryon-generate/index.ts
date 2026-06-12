@@ -71,14 +71,60 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) ?? {};
     const photoPath: string | undefined = body.photoPath;
     // Backward compatible: accept single itemImageUrl or array of items
-    const items: { imageUrl?: string; label?: string; category?: Category }[] =
+    const items: { imageUrl?: string; productUrl?: string; label?: string; category?: Category }[] =
       Array.isArray(body.items) && body.items.length > 0
         ? body.items
-        : [{ imageUrl: body.itemImageUrl, label: body.itemLabel, category: body.category }];
+        : [{ imageUrl: body.itemImageUrl, productUrl: body.productUrl, label: body.itemLabel, category: body.category }];
 
     if (!photoPath) return json({ error: "Missing photoPath" }, 400);
-    if (!items.some((i) => i.imageUrl || i.label)) {
-      return json({ error: "Provide at least one item image or description" }, 400);
+    if (!items.some((i) => i.imageUrl || i.productUrl || i.label)) {
+      return json({ error: "Provide at least one item image, link, or description" }, 400);
+    }
+
+    // If a productUrl was supplied (e.g. Myntra/Amazon link), scrape the page
+    // server-side and extract the main product image. Uses Firecrawl when
+    // available; falls back to a lightweight HTML parse for og:image.
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+    for (const it of items) {
+      if (it.imageUrl || !it.productUrl) continue;
+      try {
+        let img: string | undefined;
+        if (FIRECRAWL_API_KEY) {
+          const fc = await fetch("https://api.firecrawl.dev/v2/scrape", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: it.productUrl,
+              formats: ["markdown"],
+              onlyMainContent: true,
+            }),
+          });
+          if (fc.ok) {
+            const d = await fc.json();
+            const meta = d?.data?.metadata ?? d?.metadata ?? {};
+            img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"];
+          } else {
+            console.error("firecrawl scrape error", fc.status, await fc.text());
+          }
+        }
+        if (!img) {
+          // Fallback: fetch the page HTML and extract og:image
+          const html = await fetch(it.productUrl, {
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; StyleAI/1.0)" },
+          }).then((r) => (r.ok ? r.text() : ""));
+          const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+          if (m) img = m[1];
+        }
+        if (img) it.imageUrl = img;
+        else return json({ error: "Couldn't read product image from that link" }, 400);
+      } catch (e) {
+        console.error("productUrl fetch failed", e);
+        return json({ error: "Couldn't read product link" }, 400);
+      }
     }
 
     const { data: signed } = await supabase.storage
