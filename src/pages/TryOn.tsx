@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download } from "lucide-react";
+import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
