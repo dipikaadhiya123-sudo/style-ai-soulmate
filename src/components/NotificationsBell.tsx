@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -15,19 +15,19 @@ export default function NotificationsBell() {
   const { user } = useAuth();
   const [items, setItems] = useState<N[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from("notifications").select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }).limit(20);
     setItems((data ?? []) as N[]);
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user) { setItems([]); return; }
     load();
-  }, [user]);
+  }, [user, load]);
 
   const unread = items.filter(i => !i.read).length;
 
