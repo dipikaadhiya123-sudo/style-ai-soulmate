@@ -53,6 +53,7 @@ export default function TryOn() {
   const onItem = (file: File) => {
     setItemFile(file);
     setItemPreview(URL.createObjectURL(file));
+    setProductUrl("");
     const reader = new FileReader();
     reader.onload = () => setItemDataUrl(reader.result as string);
     reader.readAsDataURL(file);
@@ -62,7 +63,9 @@ export default function TryOn() {
   const generate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add your photo.");
-    if (!itemDataUrl) return toast.error("Add the product photo.");
+    const url = productUrl.trim();
+    const hasUrl = /^https?:\/\//i.test(url);
+    if (!itemDataUrl && !hasUrl) return toast.error("Add the product photo or paste a link.");
 
     setGenerating(true);
     resetResult();
@@ -75,11 +78,12 @@ export default function TryOn() {
       if (upErr) throw upErr;
       setPhotoPath(path);
 
+      const item: Record<string, string> = {};
+      if (itemDataUrl) item.imageUrl = itemDataUrl;
+      else if (hasUrl) item.productUrl = url;
+
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
-        body: {
-          photoPath: path,
-          items: [{ imageUrl: itemDataUrl }],
-        },
+        body: { photoPath: path, items: [item] },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
