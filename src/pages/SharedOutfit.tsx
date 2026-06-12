@@ -3,18 +3,27 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
+type SharedOutfitData = {
+  occasion: string;
+  title: string | null;
+  items: { category: string; description: string; color: string }[];
+  style_score: number | null;
+  rationale: string | null;
+  suggestions: { category: string; tip: string }[] | null;
+};
+
 export default function SharedOutfit() {
   const { slug } = useParams();
-  const [outfit, setOutfit] = useState<any>(null);
+  const [outfit, setOutfit] = useState<SharedOutfitData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      const { data } = await supabase
-        .rpc("get_shared_outfit", { _slug: slug })
-        .maybeSingle();
-      setOutfit(data);
+      const { data } = await supabase.functions.invoke("get-shared", {
+        body: { kind: "outfit", slug },
+      });
+      setOutfit((data?.outfit as SharedOutfitData | null) ?? null);
       setLoading(false);
     })();
   }, [slug]);
@@ -53,7 +62,7 @@ export default function SharedOutfit() {
         <div className="bg-gradient-card border border-border rounded-2xl p-6 shadow-soft mb-6">
           <p className="text-pretty mb-5">{outfit.rationale}</p>
           <div className="space-y-3">
-            {(outfit.items as any[]).map((it: any, i: number) => (
+            {outfit.items.map((it, i) => (
               <div key={i} className="flex gap-4 items-start py-3 border-t border-border/60 first:border-t-0 first:pt-0">
                 <div className="w-10 h-10 rounded-lg border border-border shrink-0" style={{ background: it.color }} />
                 <div className="flex-1">
@@ -69,7 +78,7 @@ export default function SharedOutfit() {
           <div className="bg-gradient-card border border-border rounded-2xl p-6 shadow-soft">
             <h2 className="font-display text-xl font-medium mb-4">Bonus tips</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              {(outfit.suggestions as any[]).map((s: any, i: number) => (
+              {outfit.suggestions.map((s, i) => (
                 <div key={i} className="p-4 rounded-xl bg-background/50 border border-border">
                   <div className="text-xs uppercase tracking-wider text-accent font-medium mb-1">{s.category}</div>
                   <div className="text-sm">{s.tip}</div>
