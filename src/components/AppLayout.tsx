@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, Navigate, useLocation } from "react-router-dom";
 import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -27,6 +27,11 @@ export default function AppLayout() {
         <div className="h-10 w-10 rounded-full border-2 border-accent border-t-transparent animate-spin" />
       </div>
     );
+  }
+
+  if (!user) {
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/auth?redirect=${redirect}`} replace />;
   }
 
   return (
