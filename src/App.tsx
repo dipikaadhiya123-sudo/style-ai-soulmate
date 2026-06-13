@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Onboarding from "./pages/Onboarding";
 import Studio from "./pages/Studio";
 import Stylist from "./pages/Stylist";
@@ -37,6 +38,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/outfit/:slug" element={<SharedOutfit />} />
           <Route path="/look/:slug" element={<SharedLook />} />
           <Route element={<AppLayout />}>
