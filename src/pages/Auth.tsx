@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
+import { buildAuthCallbackUrl } from "@/lib/authRedirect";
 
 const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -52,7 +53,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: buildAuthCallbackUrl("/stylist"),
       });
       if (result.error) throw result.error;
       if (!result.redirected) navigate("/stylist", { replace: true });
