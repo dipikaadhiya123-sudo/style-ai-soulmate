@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { completeOAuthRedirect } from "@/lib/authRedirect";
+import { completeOAuthRedirect, stripOAuthParamsFromUrl } from "@/lib/authRedirect";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -23,11 +23,12 @@ export default function AuthCallback() {
         }
 
         setMessage("Taking you inside…");
+        // Clean OAuth params from URL to prevent token exposure and refresh loops
+        stripOAuthParamsFromUrl();
         navigate(redirectTo, { replace: true });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Google sign-in failed";
         if (!active) return;
-
         toast.error(message);
         navigate("/auth", { replace: true });
       }
