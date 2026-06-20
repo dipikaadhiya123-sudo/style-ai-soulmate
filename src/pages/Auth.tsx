@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
 import { buildAuthCallbackUrl, getAuthRedirectFromSearch } from "@/lib/authRedirect";
 
@@ -35,7 +34,7 @@ export default function Auth() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
         });
         if (error) throw error;
         toast.success("Check your email to confirm your account.");
@@ -54,11 +53,14 @@ export default function Auth() {
   const handleGoogle = async () => {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: buildAuthCallbackUrl(redirectTo),
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: buildAuthCallbackUrl(redirectTo),
+        },
       });
-      if (result.error) throw result.error;
-      if (!result.redirected) navigate(redirectTo, { replace: true });
+      if (error) throw error;
+      // User is redirected to Google — page will unload
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Google sign-in failed"));
       setLoading(false);
