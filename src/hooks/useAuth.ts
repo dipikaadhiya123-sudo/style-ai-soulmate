@@ -16,7 +16,7 @@ async function ensureUserProfile(user: User) {
 
   const { error } = await supabase.from("profiles").upsert(
     { id: user.id, display_name: displayName },
-    { onConflict: "id", ignoreDuplicates: true },
+    { onConflict: "id" },
   );
 
   if (error) profileEnsuredFor.delete(user.id);
