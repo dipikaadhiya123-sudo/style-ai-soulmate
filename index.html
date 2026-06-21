@@ -3,27 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="background-color" content="#0a0a0a" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="StyleAI" />
-
-    <title>StyleAI — Your Smart Personal Stylist</title>
-    <meta name="description" content="AI-powered personal styling. Upload your photo, pick the occasion, and get a curated outfit, style score, and looks tailored to your body and skin tone." />
-
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>StyleAI — Virtual Try-On</title>
+    <meta name="description" content="AI-powered virtual try-on for clothing and accessories. Upload your photo, pick a product, and see how it looks on you. Try before you buy." />
+    <meta name="keywords" content="virtual try on, AI try on, fashion AI, online shopping, dress try on, StyleAI" />
+    <meta name="robots" content="index, follow" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-    <meta property="og:title" content="StyleAI — Your Smart Personal Stylist" />
-    <meta property="og:description" content="AI-powered personal styling tailored to your body, skin tone, and the occasion." />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..150,500;9..155,600;9..160,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <meta property="og:title" content="StyleAI — Virtual Try-On" />
+    <meta property="og:description" content="AI-powered virtual try-on. Upload your photo, paste a product link, and see the look on you." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="StyleAI" />
+    <meta name="twitter:description" content="AI-powered virtual try-on for clothing and accessories." />
+    <meta name="twitter:image" content="/icons/icon-512x512.png" />
+    <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").then(
+            (reg) => console.log("SW registered:", reg.scope),
+            (err) => console.log("SW failed:", err)
+          );
+        });
+      }
+    </script>
   </body>
 </html>
