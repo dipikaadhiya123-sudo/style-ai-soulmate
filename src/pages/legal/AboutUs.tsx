@@ -17,25 +17,18 @@ export default function AboutUs() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 mb-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold text-lg">Our Mission</h2>
-        </div>
+        <h2 className="font-semibold text-lg mb-2">Our Mission</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          StyleAI is on a mission to revolutionize the way people shop for fashion. We believe that everyone deserves
-          to see how clothes and accessories look on them before they buy. Our AI-powered virtual try-on
-          technology brings the fitting room to your phone, making online shopping confident, fun,
-          and sustainable.
+          StyleAI is on a mission to revolutionize the way people shop for fashion. Our AI-powered
+          virtual try-on technology brings the fitting room to your phone. Based in Mumbai, India, we
+          serve users worldwide with UPI and Stripe payments and AI models optimized for diverse skin tones.
         </p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold text-lg">Safety Commitment</h2>
-        </div>
+        <h2 className="font-semibold text-lg mb-2">Safety Commitment</h2>
         <p className="text-sm text-muted-foreground">
-          AI content moderation 24/7 human review, zero tolerance for child exploitation (NCMEC reporting), GDPR CCPA compliant.
+          AI-powered content moderation, 24/7 human review, zero tolerance for child exploitation (NCMEC reporting), GDPR and CCPA compliant.
         </p>
       </div>
 
@@ -45,7 +38,7 @@ export default function AboutUs() {
           <Link to="/terms" className="text-xs text-muted-foreground hover:text-accent">Terms</Link>
           <Link to="/contact" className="text-xs text-muted-foreground hover:text-accent">Contact</Link>
         </div>
-        <p className="text-xs text-muted-foreground">2026 StyleAI Necknologies. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">2026 StyleAI Technologies. All rights reserved.</p>
         <Link to="/" className="text-sm text-accent hover:underline mt-2 inline-block">‚Üê Back to StyleAI</Link>
       </div>
     </div>
@@ -55,7 +48,7 @@ export default function AboutUs() {
 function Stat({ icon: Icon, value, label }: { icon: any; value: string; label: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4 text-center">
-      “con className="w-6 h-6 text-accent mx-auto mb-2" />
+      <Icon className="w-6 h-6 text-accent mx-auto mb-2" />
       <p className="text-2xl font-bold">{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
