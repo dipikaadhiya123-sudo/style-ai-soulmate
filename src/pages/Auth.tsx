@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { buildAuthCallbackUrl, getAuthRedirectFromSearch } from "@/lib/authRedirect";
+import { getAuthRedirectFromSearch } from "@/lib/authRedirect";
 
 const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -15,57 +16,88 @@ const getErrorMessage = (err: unknown, fallback: string) =>
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const redirectTo = getAuthRedirectFromSearch(location.search);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate(redirectTo, { replace: true });
-  }, [user, navigate, redirectTo]);
+    if (user && !authLoading) navigate(redirectTo, { replace: true });
+  }, [user, authLoading, navigate, redirectTo]);
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { display_name: email.split("@")[0] },
+          },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account.");
+        if (data?.user?.identities?.length === 0) {
+          toast.error("An account with this email already exists. Please sign in instead.");
+          setMode("signin");
+        } else if (data?.session) {
+          toast.success("Account created! Redirecting…");
+          navigate(redirectTo, { replace: true });
+        } else {
+          toast.success("Check your email to confirm your account.");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success("Signed in!");
         navigate(redirectTo, { replace: true });
       }
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Something went wrong"));
+      toast.error(getErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
-    setLoading(true);
+    if (googleLoading) return;
+    setGoogleLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const callbackUrl = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: buildAuthCallbackUrl(redirectTo),
+          redirectTo: callbackUrl,
+          queryParams: { access_type: "offline", prompt: "consent" },
         },
       });
       if (error) throw error;
-      // User is redirected to Google — page will unload
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No redirect URL returned from Supabase");
+      }
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Google sign-in failed"));
-      setLoading(false);
+      const msg = getErrorMessage(err, "Google sign-in failed");
+      toast.error(msg, {
+        description: "Make sure Google OAuth is enabled in your Supabase project settings.",
+        duration: 8000,
+      });
+      setGoogleLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex flex-col">
@@ -92,16 +124,20 @@ export default function Auth() {
           <Button
             type="button"
             variant="outline"
-            className="w-full mb-5"
+            className="w-full mb-5 h-11"
             onClick={handleGoogle}
-            disabled={loading}
+            disabled={googleLoading}
           >
-            <svg className="w-4 h-4" viewBox="0 0 48 48" aria-hidden>
-              <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/>
-              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/>
-              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-              <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/>
-            </svg>
+            {googleLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <svg className="w-4 h-4 mr-2" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/>
+                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/>
+                <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/>
+              </svg>
+            )}
             Continue with Google
           </Button>
 
@@ -113,14 +149,23 @@ export default function Auth() {
           <form onSubmit={handleEmail} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              <Input
+                id="email" type="email" required autoComplete="email"
+                value={email} onChange={(c) => setEmail(c.target.value)}
+                placeholder="you@example.com"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} />
+              <Input
+                id="password" type="password" required minLength={6}
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                value={password} onChange={(c) => setPassword(c.target.value)}
+              />
             </div>
-            <Button type="submit" disabled={loading} className="w-full bg-gradient-accent text-accent-foreground border-0 hover:opacity-95">
-              {loading ? "..." : mode === "signin" ? "Sign in" : "Create account"}
+            <Button type="submit" disabled={loading} className="w-full bg-gradient-accent text-accent-foreground border-0 hover:opacity-95 h-11">
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {"": "}}</>
+              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>
 
