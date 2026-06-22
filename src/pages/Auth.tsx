@@ -12,19 +12,6 @@ import { getAuthRedirectFromSearch } from "@/lib/authRedirect";
 
 const getErrorMessage = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 
-async function checkGoogleOAuthConfigured(): Promise<boolean> {
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-  if (!SUPABASE_URL) return false;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, {
-      headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "" },
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data?.external?.google === true;
-  } catch { return false; }
-}
-
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,13 +22,10 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleConfigured, setGoogleConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) navigate(redirectTo, { replace: true });
   }, [user, authLoading, navigate, redirectTo]);
-
-  useEffect(() => { checkGoogleOAuthConfigured().then(setGoogleConfigured); }, []);
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,14 +49,25 @@ export default function Auth() {
     if (googleLoading) return;
     setGoogleLoading(true);
     try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const callbackUrl = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`;
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: callbackUrl, queryParams: { access_type: "offline", prompt: "consent" } } });
-      if (error) {
-        toast.error(error.message, { description: "Enable Google OAuth in Supabase project settings.", duration: 8000 });
-        throw error;
+      const params = new URLSearchParams({ provider: "google", redirect_to: callbackUrl });
+      const authUrl = `${SUPABASE_URL}/auth/v1/authorize?${params}.toString()`;
+      const response = await fetch(authUrl, { redirect: "manual" });
+      if (response.type === "opaqueredirect") {
+        window.location.href = authUrl;
+      } else {
+        const text = await response.text();
+        let msg = "Google sign-in is not available.";
+        try { const json = JSON.parse(text); if (json.msg) msg = json.msg; } catch () {}
+        if (msg.includes("Unsupported") || msg.includes("missing OAuth") || msg.includes("validation")) {
+          toast.error("Google OAuth not configured", {
+            description: "Enable Google Sign-In in your Supabase dashboard: supabase.com/dashboard → Authentication → Providers → Google.", duration: 10000 });
+        } else { toast.error(msg); }
       }
-    } catch (err: unknown) { toast.error(getErrorMessage(err, "Google sign-in failed."), { description: "Use email/password or check Supabase settings.", duration: 6000 }); }
-    finally { setGoogleLoading(false); }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Google sign-in failed."), { description: "Use email/password sign-in or enable Google OAuth in Supabase settings.", duration: 6000 });
+    } finally { setGoogleLoading(false); }
   };
 
   if (authLoading) return (<div className="min-h-screen flex items-center justify-center bg-gradient-hero"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>);
@@ -87,25 +82,10 @@ export default function Auth() {
           <h1 className="font-display text-3xl font-medium mb-1.5">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
           <p className="text-sm text-muted-foreground mb-7">{mode === "signin" ? "Sign in to continue styling." : "Start your styling journey."}</p>
 
-          {googleConfigured !== false && (
-            <Button type="button" variant="outline" className="w-full mb-3 h-11" onClick={handleGoogle} disabled={googleLoading || googleConfigured === null}>
-              {googleLoading || googleConfigured === null ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <svg className="w-4 h-4 mr-2" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>}
-              Continue with Google
-            </Button>
-          )}
-
-          {googleConfigured === false && (
-            <div className="mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-              <div className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold mt-0.5 text-sm">❨</span>
-                <div>
-                  <p className="text-sm font-medium text-amber-600">Google Sign-In Not Configured</p>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">To enable Google Sign-In, add your Google OAuth credentials in the Supabase dashboard.</p>
-                  <a href="https://supabase.com/dashboard/project/gvbjqgpkaconywgmzbcw/auth/providers" target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs text-accent hover:underline font-medium">Enable in Supabase Dashboard →</a>
-                </div>
-              </div>
-            </div>
-          )}
+          <Button type="button" variant="outline" className="w-full mb-5 h-11" onClick={handleGoogle} disabled={googleLoading}>
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <svg className="w-4 h-4 mr-2" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H4220H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>}
+            Continue with Google
+          </Button>
 
           <div className="relative my-5"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><div className="relative flex justify-center text-xs"><span className="bg-card px-3 text-muted-foreground">or</span></div></div>
 
@@ -119,7 +99,7 @@ export default function Auth() {
               <Input id="password" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(c) => setPassword(c.target.value)} />
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-gradient-accent text-accent-foreground border-0 hover:opacity-95 h-11">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {"": "}</>
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {"": "}}</>
               {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>
