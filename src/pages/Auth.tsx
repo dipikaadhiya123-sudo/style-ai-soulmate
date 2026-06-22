@@ -10,8 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectFromSearch } from "@/lib/authRedirect";
 
-const getErrorMessage = (err: unknown, fallback: string) =>
-  err instanceof Error ? err.message : fallback;
+const getErrorMessage = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -23,6 +22,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) navigate(redirectTo, { replace: true });
@@ -65,6 +65,7 @@ export default function Auth() {
 
   const handleGoogle = async () => {
     if (googleLoading) return;
+    setGoogleError(null);
     setGoogleLoading(true);
     try {
       const callbackUrl = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`;
@@ -75,28 +76,35 @@ export default function Auth() {
           queryParams: { access_type: "offline", prompt: "consent" },
         },
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes("Unsupported") || error.message?.includes("OAuth") || error.message?.includes("provider")) {
+          setGoogleError("Google Sign-In is not configured yet. The developer needs to enable Google OAuth in the Supabase dashboard.");
+          return;
+        }
+        throw error;
+      }
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        throw new Error("No redirect URL returned from Supabase");
+        throw new Error("No redirect URL returned from Supabase.");
       }
     } catch (err: unknown) {
-      const msg = getErrorMessage(err, "Google sign-in failed");
-      toast.error(msg, {
-        description: "Make sure Google OAuth is enabled in your Supabase project settings.",
-        duration: 8000,
-      });
+      const msg = getErrorMessage(err, "Google sign-in failed.");
+      if (msg.includes("Unsupported") || msg.includes("OAuth") || msg.includes("provider") || msg.includes("validation")) {
+        setGoogleError("Google Sign-In is not configured yet. Please enable Google OAuth in the Supabase project settings at supabase.com/dashboard.");
+      } else {
+        toast.error(msg, {
+          description: "Try again or use email/password sign-in instead.",
+          duration: 6000,
+        });
+      }
+    } finally {
       setGoogleLoading(false);
     }
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
-      </div>
-    );
+    return (<div className="min-h-screen flex items-center justify-center bg-gradient-hero"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>);
   }
 
   return (
@@ -108,12 +116,7 @@ export default function Auth() {
         </Link>
       </header>
       <div className="flex-1 flex items-center justify-center px-4 pb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="w-full max-w-md bg-card border border-border rounded-2xl p-8 shadow-elev"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="w-full max-w-md bg-card border border-border rounded-2xl p-8 shadow-elev">
           <h1 className="font-display text-3xl font-medium mb-1.5">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
@@ -121,25 +124,27 @@ export default function Auth() {
             {mode === "signin" ? "Sign in to continue styling." : "Start your styling journey."}
           </p>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full mb-5 h-11"
-            onClick={handleGoogle}
-            disabled={googleLoading}
-          >
-            {googleLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : (
-              <svg className="w-4 h-4 mr-2" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/>
-                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/>
-                <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/>
-              </svg>
-            )}
+          <Button type="button" variant="outline" className="w-full mb-3 h-11" onClick={handleGoogle} disabled={googleLoading}>
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <svg className="w-4 h-4 mr-2" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 6 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.7 1.1 7.8 3l5.7-5.7C33.5 7 29 5 24 5 16.3 5 9.7 9.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2c-2 1.5-4.6 2.4-7.3 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.9 36 44 30.6 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>}
             Continue with Google
           </Button>
+
+          {googleError && (
+            <div className="mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold mt-0.5 text-sm">⚠</span>
+                <div>
+                  <p className="text-sm font-medium text-amber-600">Google Sign-In Not Configured</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{googleError}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <a href="https://supabase.com/dashboard/project/gvbjqgpkaconywgmzbcw/auth/providers" target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:underline font-medium">Enable Google OAuth →</a>
+                    <a href="https://supabase.com/docs/guides/auth/social-login/auth-google" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">Setup Guide</a>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">In the meantime, you can sign in with email below.</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
@@ -149,19 +154,11 @@ export default function Auth() {
           <form onSubmit={handleEmail} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email" type="email" required autoComplete="email"
-                value={email} onChange={(c) => setEmail(c.target.value)}
-                placeholder="you@example.com"
-              />
+              <Input id="email" type="email" required autoComplete="email" value={email} onChange={(c) => setEmail(c.target.value)} placeholder="you@example.com" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password" type="password" required minLength={6}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                value={password} onChange={(c) => setPassword(c.target.value)}
-              />
+              <Input id="password" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(c) => setPassword(c.target.value)} />
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-gradient-accent text-accent-foreground border-0 hover:opacity-95 h-11">
               {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {"": "}}</>
@@ -171,11 +168,7 @@ export default function Auth() {
 
           <div className="text-sm text-muted-foreground text-center mt-6">
             {mode === "signin" ? "New here?" : "Already have an account?"}{" "}
-            <button
-              type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="text-accent font-medium hover:underline"
-            >
+            <button type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-accent font-medium hover:underline">
               {mode === "signin" ? "Create one" : "Sign in"}
             </button>
           </div>
