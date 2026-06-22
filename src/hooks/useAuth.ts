@@ -5,14 +5,39 @@ import { supabase } from "@/integrations/supabase/client";
 const profileEnsuredFor = new Set<string>();
 
 async function ensureUserProfile(user: User) {
-  if (profileEnsuredFor.has(user.id)) return;
+  if (!user?.id || profileEnsuredFor.has(user.id)) return;
   profileEnsuredFor.add(user.id);
-  const displayName = user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split("@")[0] ?? null;
-  const { error } = await supabase.from("profiles").upsert(
-    { id: user.id, display_name: displayName },
-    { onConflict: "id" },
-  );
-  if (error) profileEnsuredFor.delete(user.id);
+
+  try {
+    const metadata = user.user_metadata ?? {};
+    const fullName =
+      metadata.full_name ??
+      metadata.name ??
+      metadata.display_name ??
+      user.email?.split("@")[0] ??
+      "User";
+
+    const avatarUrl = metadata.avatar_url ?? metadata.picture ?? null;
+
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: user.id,
+        display_name: fullName,
+        email: user.email,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id", ignoreDuplicates: false }
+    );
+
+    if (error) {
+      console.warn("[useAuth] Failed to upsert profile:", error.message);
+      profileEnsuredFor.delete(user.id);
+    }
+  } catch (err) {
+    console.warn("[useAuth] ensureUserProfile error:", err);
+    profileEnsuredFor.delete(user.id);
+  }
 }
 
 export function useAuth() {
