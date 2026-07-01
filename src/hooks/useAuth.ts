@@ -19,7 +19,7 @@ async function ensureUserProfile(user: User) {
 
     const avatarUrl = metadata.avatar_url ?? metadata.picture ?? null;
 
-    const { error } = await supabase.from("profiles").upsert(
+    const { error } = await (supabase as any).from("profiles").upsert(
       {
         id: user.id,
         display_name: fullName,
