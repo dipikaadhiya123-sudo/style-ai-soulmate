@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectFromSearch } from "@/lib/authRedirect";
 import type { AuthError } from "@supabase/supabase-js";
@@ -100,38 +101,28 @@ export default function Auth() {
   const handleGoogle = async () => {
     if (googleLoading) return;
     setGoogleLoading(true);
-
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
+      // Persist intended destination so we can restore it after the session hydrates
+      try { sessionStorage.setItem("postAuthRedirect", redirectTo); } catch { /* ignore */ }
+
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
       });
 
-      if (error) {
-        const msg = getAuthErrorMessage(error);
-        toast.error(msg || "Google Sign-In failed.", {
-          description: "Make sure Google OAuth is enabled in your project settings.",
-          duration: 8000,
+      if (result.error) {
+        toast.error(result.error.message || "Google Sign-In failed.", {
+          description: "Try again in a moment, or use email sign-in.",
+          duration: 6000,
         });
         return;
       }
 
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error("Unable to start Google Sign-In. Please try again.");
-      }
+      if (result.redirected) return; // browser will navigate away
+
+      // Popup flow completed: session is set — go to intended destination
+      navigate(redirectTo, { replace: true });
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Google Sign-In failed."), {
-        description: "Use email/password sign-in or enable Google OAuth in project settings.",
-        duration: 6000,
-      });
+      toast.error(getErrorMessage(err, "Google Sign-In failed."));
     } finally {
       setGoogleLoading(false);
     }

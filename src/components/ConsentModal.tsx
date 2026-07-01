@@ -15,9 +15,9 @@ export default function ConsentModal({ show, onAccept, onDecline }: { show: bool
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase.from("user_consent").upsert({ user_id: user.id, consent_type: "photo_upload", accepted: true, version: "1.0" });
+        await (supabase as any).from("user_consent").upsert({ user_id: user.id, consent_type: "photo_upload", accepted: true, version: "1.0" });
         if (aiConsent) {
-          await supabase.from("user_consent").upsert({ user_id: user.id, consent_type: "ai_training", accepted: true, version: "1.0" });
+          await (supabase as any).from("user_consent").upsert({ user_id: user.id, consent_type: "ai_training", accepted: true, version: "1.0" });
         }
       }
     } catch (_e) { }

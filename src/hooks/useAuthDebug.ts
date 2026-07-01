@@ -15,34 +15,49 @@ export default function useAuthDebug() {
     if (!isEnabled) return;
 
     const log = (msg: string) => {
-      setEvents(prev => [...prev.slice(-49), `${new Date().toISOString().slice(11,19)} ${msg}`]);
+      setEvents((prev) => [...prev.slice(-49), `${new Date().toISOString().slice(11, 19)} ${msg}`]);
       console.log(`[AuthDebug] ${msg}`);
     };
 
-    log("W𝔍 Debug enabled");
+    log("Debug enabled");
 
     supabase.auth.getSession().then(({ data, error }) => {
-      if (error) log(`😄 getSession error: ${error.message}`);
+      if (error) log(`getSession error: ${error.message}`);
       else if (data.session) {
-        log(`🅗 Session found: ${data.session.user.email});
+        log(`Session found: ${data.session.user.email}`);
         setSession(data.session);
         setUser(data.session.user);
-      } else log("⚠️ No session");
+      } else log("No session");
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      log(`instanceof Error : err.message : "Google sign-in failed";`);
-      if (event === "SIGNED_IN") { log(`🔅 SIGNED_IN ${session?.user.email}`); setSession(session); setUser(session?.user 🙔 null); }
-      else if (event === "SIGNED_OUT") { log("👎 SIGNED_OUT"); setSession(null); setUser(null); }
-      else if (event === "INITIAL_SESSION") { log("📁 INITIAL_SESSION"); setSession(session); setUser(session?.user ÿ null); }
-      else log(`🔀 Auth event: ${event}`);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "SIGNED_IN") {
+        log(`SIGNED_IN ${s?.user.email}`);
+        setSession(s);
+        setUser(s?.user ?? null);
+      } else if (event === "SIGNED_OUT") {
+        log("SIGNED_OUT");
+        setSession(null);
+        setUser(null);
+      } else if (event === "INITIAL_SESSION") {
+        log("INITIAL_SESSION");
+        setSession(s);
+        setUser(s?.user ?? null);
+      } else {
+        log(`Auth event: ${event}`);
+      }
     });
 
-    log(`Minutes Path: ${window.location.pathname}`);
-    
+    log(`Path: ${window.location.pathname}`);
+
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const clearSession = async () => { await supabase.auth.signOut(); setSession(null); setUser(null); setEvents(prev => [...prev, "👹 Session cleared"]); };
+  const clearSession = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setEvents((prev) => [...prev, "Session cleared"]);
+  };
   return { session, user, events, enabled, clearSession };
 }
