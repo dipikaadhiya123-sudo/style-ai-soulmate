@@ -51,7 +51,7 @@ export default function AuthCallback() {
           setMessage("Exchanging code for session\u2026");
           const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeErr) throw exchangeErr;
-        } else if (accessToken && refreshToken), {
+        } else if (accessToken && refreshToken) {
           setMessage("Setting up your session\u2026");
           const { error: sessionErr } = await supabase.auth.setSession({
             access_token: accessToken,
