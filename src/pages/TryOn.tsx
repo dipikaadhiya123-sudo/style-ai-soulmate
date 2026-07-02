@@ -209,7 +209,22 @@ export default function TryOn() {
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="font-display text-2xl font-medium mb-4">Before / After</h2>
+
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
+              <img src={photoPreview} alt="Before" className="w-full aspect-[4/5] object-cover" />
+              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">Before</figcaption>
+            </figure>
+            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
+              <img src={resultUrl} alt="After" className="w-full aspect-[4/5] object-cover" />
+              <figcaption className="text-[11px] uppercase tracking-widest text-accent px-3 py-2">After{detected?.label ? ` · ${detected.label}` : ""}</figcaption>
+            </figure>
+          </div>
+
+          <div className="text-xs text-muted-foreground mb-2">Drag the slider to compare</div>
           <BeforeAfter beforeUrl={photoPreview} afterUrl={resultUrl} itemLabel={detected?.label ?? ""} />
+
+
 
           <div className="flex flex-wrap gap-2 mt-6">
             {!savedSlug ? (
