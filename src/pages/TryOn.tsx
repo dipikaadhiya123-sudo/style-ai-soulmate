@@ -104,6 +104,7 @@ export default function TryOn() {
   useEffect(() => () => {
     if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
     if (itemPreview?.startsWith("blob:")) URL.revokeObjectURL(itemPreview);
+    if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
   }, [photoPreview, itemPreview]);
 
   const resetResult = () => {
