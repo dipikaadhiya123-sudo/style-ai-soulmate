@@ -237,7 +237,9 @@ export default function TryOn() {
     toast.success("Link copied");
   };
 
-  const canGenerate = !!photoFile && (!!itemDataUrl || /^https?:\/\//i.test(productUrl.trim())) && !generating;
+  const canGenerateUrl =
+    /^https?:\/\//i.test(productUrl.trim()) && validateUrlFormat(productUrl.trim()) === null && urlStatus !== "error";
+  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateUrl) && !generating;
 
   return (
     <div className="container max-w-3xl py-10">
