@@ -19,6 +19,8 @@ export default function TryOn() {
   const [itemDataUrl, setItemDataUrl] = useState<string | null>(null);
   const [itemPreview, setItemPreview] = useState<string | null>(null);
   const [productUrl, setProductUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlStatus, setUrlStatus] = useState<"idle" | "checking" | "reachable" | "error">("idle");
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -27,6 +29,73 @@ export default function TryOn() {
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
+
+  const validateUrlFormat = useCallback((url: string) => {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "Link must start with http:// or https://";
+      }
+      return null;
+    } catch {
+      return "Please enter a valid URL, e.g. https://example.com/image.jpg";
+    }
+  }, []);
+
+  const isImageUrlReachable = useCallback((url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const timeout = setTimeout(() => reject(new Error("Image took too long to load — the link may be unreachable or blocked.")), 15000);
+      img.onload = () => { clearTimeout(timeout); resolve(); };
+      img.onerror = () => { clearTimeout(timeout); reject(new Error("Could not load image from that link. Check the URL or try a direct .jpg/.png link.")); };
+      img.src = url;
+    });
+  }, []);
+
+  const checkUrl = useCallback(async (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setUrlError(null);
+      setUrlStatus("idle");
+      return;
+    }
+    const formatError = validateUrlFormat(trimmed);
+    if (formatError) {
+      setUrlError(formatError);
+      setUrlStatus("error");
+      return;
+    }
+    setUrlStatus("checking");
+    setUrlError(null);
+    try {
+      await isImageUrlReachable(trimmed);
+      setUrlStatus("reachable");
+      setUrlError(null);
+    } catch (e: any) {
+      setUrlError(e.message ?? "That link doesn't seem to work.");
+      setUrlStatus("error");
+    }
+  }, [validateUrlFormat, isImageUrlReachable]);
+
+  const urlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onProductUrlChange = (value: string) => {
+    setProductUrl(value);
+    setUrlError(null);
+    setUrlStatus("idle");
+    if (value) {
+      setItemFile(null);
+      setItemPreview(null);
+      setItemDataUrl(null);
+    }
+    resetResult();
+    if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
+    const trimmed = value.trim();
+    if (trimmed) {
+      urlTimeoutRef.current = setTimeout(() => checkUrl(trimmed), 600);
+    }
+  };
 
   const photoInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
