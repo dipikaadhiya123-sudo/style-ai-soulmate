@@ -155,8 +155,8 @@ export default function TryOn() {
         await isImageUrlReachable(url);
         setUrlStatus("reachable");
         setUrlError(null);
-      } catch (e: any) {
-        const msg = e?.message ?? "That image link is unreachable.";
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "That image link is unreachable.";
         setUrlError(msg);
         setUrlStatus("error");
         return toast.error(msg);
