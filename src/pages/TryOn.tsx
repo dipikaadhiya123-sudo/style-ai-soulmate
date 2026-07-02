@@ -177,16 +177,67 @@ export default function TryOn() {
         />
       </div>
 
-      <div className="relative mb-6">
-        <Link2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={productUrl}
-          onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
-          placeholder="…or paste a product link (Myntra, Amazon, etc.)"
-          className="pl-9 h-12"
-          inputMode="url"
-        />
+      <div className="rounded-2xl border border-border bg-gradient-card p-4 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="product-link" className="text-sm font-medium flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-accent" /> Paste image link
+          </label>
+          {productUrl && (
+            <button
+              type="button"
+              onClick={() => { setProductUrl(""); resetResult(); }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Paste any product or image URL (Myntra, Amazon, Zara, or a direct .jpg/.png link).
+        </p>
+        <div className="flex gap-2">
+          <Input
+            id="product-link"
+            value={productUrl}
+            onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
+            placeholder="https://example.com/product-image.jpg"
+            className="h-12 flex-1"
+            inputMode="url"
+            autoComplete="off"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 shrink-0"
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                  setProductUrl(text.trim());
+                  setItemFile(null); setItemPreview(null); setItemDataUrl(null);
+                  resetResult();
+                }
+              } catch {
+                toast.error("Clipboard unavailable — paste manually");
+              }
+            }}
+          >
+            Paste
+          </Button>
+        </div>
+        {/^https?:\/\//i.test(productUrl.trim()) && (
+          <div className="mt-3 flex items-center gap-3">
+            <img
+              src={productUrl.trim()}
+              alt="Link preview"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              className="w-14 h-14 rounded-lg object-cover border border-border bg-background"
+            />
+            <span className="text-xs text-muted-foreground truncate">{productUrl.trim()}</span>
+          </div>
+        )}
       </div>
+
 
       <input ref={photoInput} type="file" accept="image/*" className="hidden"
         onChange={e => e.target.files?.[0] && onPhoto(e.target.files[0])} />
