@@ -344,6 +344,11 @@ export default function TryOn() {
             <img
               src={productUrl.trim()}
               alt="Link preview"
+              referrerPolicy="no-referrer"
+              onError={() => {
+                setUrlError("Preview failed to load. The link may be blocked by the site; try copying the image address directly.");
+                setUrlStatus("error");
+              }}
               className="w-14 h-14 rounded-lg object-cover border border-border bg-background"
             />
             <span className="text-xs text-muted-foreground truncate">{productUrl.trim()}</span>
