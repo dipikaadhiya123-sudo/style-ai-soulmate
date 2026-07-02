@@ -136,6 +136,29 @@ export default function TryOn() {
     const hasUrl = /^https?:\/\//i.test(url);
     if (!itemDataUrl && !hasUrl) return toast.error("Add the product photo or paste a link.");
 
+    if (hasUrl && !itemDataUrl) {
+      const formatError = validateUrlFormat(url);
+      if (formatError) {
+        setUrlError(formatError);
+        setUrlStatus("error");
+        return toast.error(formatError);
+      }
+      if (urlStatus === "error" && urlError) {
+        return toast.error(urlError);
+      }
+      setUrlStatus("checking");
+      try {
+        await isImageUrlReachable(url);
+        setUrlStatus("reachable");
+        setUrlError(null);
+      } catch (e: any) {
+        const msg = e?.message ?? "That image link is unreachable.";
+        setUrlError(msg);
+        setUrlStatus("error");
+        return toast.error(msg);
+      }
+    }
+
     setGenerating(true);
     resetResult();
     try {
