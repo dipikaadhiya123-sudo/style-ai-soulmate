@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2 } from "lucide-react";
+import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ export default function TryOn() {
   const [itemDataUrl, setItemDataUrl] = useState<string | null>(null);
   const [itemPreview, setItemPreview] = useState<string | null>(null);
   const [productUrl, setProductUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlStatus, setUrlStatus] = useState<"idle" | "checking" | "reachable" | "error">("idle");
 
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -28,6 +30,74 @@ export default function TryOn() {
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
 
+  const validateUrlFormat = useCallback((url: string) => {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "Link must start with http:// or https://";
+      }
+      return null;
+    } catch {
+      return "Please enter a valid URL, e.g. https://example.com/image.jpg";
+    }
+  }, []);
+
+  const isImageUrlReachable = useCallback((url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const timeout = setTimeout(() => reject(new Error("Image took too long to load — the link may be unreachable or blocked.")), 15000);
+      img.onload = () => { clearTimeout(timeout); resolve(); };
+      img.onerror = () => { clearTimeout(timeout); reject(new Error("Could not load image from that link. Check the URL or try a direct .jpg/.png link.")); };
+      img.src = url;
+    });
+  }, []);
+
+  const checkUrl = useCallback(async (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setUrlError(null);
+      setUrlStatus("idle");
+      return;
+    }
+    const formatError = validateUrlFormat(trimmed);
+    if (formatError) {
+      setUrlError(formatError);
+      setUrlStatus("error");
+      return;
+    }
+    setUrlStatus("checking");
+    setUrlError(null);
+    try {
+      await isImageUrlReachable(trimmed);
+      setUrlStatus("reachable");
+      setUrlError(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "That link doesn't seem to work.";
+      setUrlError(msg);
+      setUrlStatus("error");
+    }
+  }, [validateUrlFormat, isImageUrlReachable]);
+
+  const urlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onProductUrlChange = (value: string) => {
+    setProductUrl(value);
+    setUrlError(null);
+    setUrlStatus("idle");
+    if (value) {
+      setItemFile(null);
+      setItemPreview(null);
+      setItemDataUrl(null);
+    }
+    resetResult();
+    if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
+    const trimmed = value.trim();
+    if (trimmed) {
+      urlTimeoutRef.current = setTimeout(() => checkUrl(trimmed), 600);
+    }
+  };
+
   const photoInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const itemInput = useRef<HTMLInputElement>(null);
@@ -35,6 +105,7 @@ export default function TryOn() {
   useEffect(() => () => {
     if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
     if (itemPreview?.startsWith("blob:")) URL.revokeObjectURL(itemPreview);
+    if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
   }, [photoPreview, itemPreview]);
 
   const resetResult = () => {
@@ -54,6 +125,8 @@ export default function TryOn() {
     setItemFile(file);
     setItemPreview(URL.createObjectURL(file));
     setProductUrl("");
+    setUrlError(null);
+    setUrlStatus("idle");
     const reader = new FileReader();
     reader.onload = () => setItemDataUrl(reader.result as string);
     reader.readAsDataURL(file);
@@ -66,6 +139,29 @@ export default function TryOn() {
     const url = productUrl.trim();
     const hasUrl = /^https?:\/\//i.test(url);
     if (!itemDataUrl && !hasUrl) return toast.error("Add the product photo or paste a link.");
+
+    if (hasUrl && !itemDataUrl) {
+      const formatError = validateUrlFormat(url);
+      if (formatError) {
+        setUrlError(formatError);
+        setUrlStatus("error");
+        return toast.error(formatError);
+      }
+      if (urlStatus === "error" && urlError) {
+        return toast.error(urlError);
+      }
+      setUrlStatus("checking");
+      try {
+        await isImageUrlReachable(url);
+        setUrlStatus("reachable");
+        setUrlError(null);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "That image link is unreachable.";
+        setUrlError(msg);
+        setUrlStatus("error");
+        return toast.error(msg);
+      }
+    }
 
     setGenerating(true);
     resetResult();
@@ -143,7 +239,9 @@ export default function TryOn() {
     toast.success("Link copied");
   };
 
-  const canGenerate = !!photoFile && (!!itemDataUrl || /^https?:\/\//i.test(productUrl.trim())) && !generating;
+  const canGenerateUrl =
+    /^https?:\/\//i.test(productUrl.trim()) && validateUrlFormat(productUrl.trim()) === null && urlStatus !== "error";
+  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateUrl) && !generating;
 
   return (
     <div className="container max-w-3xl py-10">
@@ -177,7 +275,10 @@ export default function TryOn() {
         />
       </div>
 
-      <div className="rounded-2xl border border-border bg-gradient-card p-4 mb-6">
+      <div className={cn(
+        "rounded-2xl border p-4 mb-6 transition-colors",
+        urlError ? "border-destructive/60 bg-destructive/5" : "border-border bg-gradient-card"
+      )}>
         <div className="flex items-center justify-between mb-2">
           <label htmlFor="product-link" className="text-sm font-medium flex items-center gap-2">
             <Link2 className="w-4 h-4 text-accent" /> Paste image link
@@ -185,7 +286,7 @@ export default function TryOn() {
           {productUrl && (
             <button
               type="button"
-              onClick={() => { setProductUrl(""); resetResult(); }}
+              onClick={() => { setProductUrl(""); setUrlError(null); setUrlStatus("idle"); resetResult(); }}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
@@ -199,9 +300,10 @@ export default function TryOn() {
           <Input
             id="product-link"
             value={productUrl}
-            onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
+            onChange={(e) => onProductUrlChange(e.target.value)}
+            onBlur={() => checkUrl(productUrl.trim())}
             placeholder="https://example.com/product-image.jpg"
-            className="h-12 flex-1"
+            className={cn("h-12 flex-1", urlError && "border-destructive focus-visible:ring-destructive")}
             inputMode="url"
             autoComplete="off"
           />
@@ -213,9 +315,7 @@ export default function TryOn() {
               try {
                 const text = await navigator.clipboard.readText();
                 if (text) {
-                  setProductUrl(text.trim());
-                  setItemFile(null); setItemPreview(null); setItemDataUrl(null);
-                  resetResult();
+                  onProductUrlChange(text.trim());
                 }
               } catch {
                 toast.error("Clipboard unavailable — paste manually");
@@ -225,16 +325,41 @@ export default function TryOn() {
             Paste
           </Button>
         </div>
-        {/^https?:\/\//i.test(productUrl.trim()) && (
+
+        {urlError && (
+          <div className="mt-3 flex items-start gap-2 text-sm text-destructive">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{urlError}</span>
+          </div>
+        )}
+
+        {urlStatus === "checking" && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Checking if that image can be reached…
+          </div>
+        )}
+
+        {urlStatus === "reachable" && productUrl && (
           <div className="mt-3 flex items-center gap-3">
             <img
               src={productUrl.trim()}
               alt="Link preview"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              referrerPolicy="no-referrer"
+              onError={() => {
+                setUrlError("Preview failed to load. The link may be blocked by the site; try copying the image address directly.");
+                setUrlStatus("error");
+              }}
               className="w-14 h-14 rounded-lg object-cover border border-border bg-background"
             />
             <span className="text-xs text-muted-foreground truncate">{productUrl.trim()}</span>
           </div>
+        )}
+
+        {urlStatus === "error" && productUrl && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tip: Some sites block direct image links. Right-click the product image, choose “Copy image address,” and paste that here.
+          </p>
         )}
       </div>
 
