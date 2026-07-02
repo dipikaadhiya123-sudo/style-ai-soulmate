@@ -123,6 +123,8 @@ export default function TryOn() {
     setItemFile(file);
     setItemPreview(URL.createObjectURL(file));
     setProductUrl("");
+    setUrlError(null);
+    setUrlStatus("idle");
     const reader = new FileReader();
     reader.onload = () => setItemDataUrl(reader.result as string);
     reader.readAsDataURL(file);
