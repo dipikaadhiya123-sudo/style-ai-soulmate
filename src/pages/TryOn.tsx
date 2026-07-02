@@ -273,7 +273,10 @@ export default function TryOn() {
         />
       </div>
 
-      <div className="rounded-2xl border border-border bg-gradient-card p-4 mb-6">
+      <div className={cn(
+        "rounded-2xl border p-4 mb-6 transition-colors",
+        urlError ? "border-destructive/60 bg-destructive/5" : "border-border bg-gradient-card"
+      )}>
         <div className="flex items-center justify-between mb-2">
           <label htmlFor="product-link" className="text-sm font-medium flex items-center gap-2">
             <Link2 className="w-4 h-4 text-accent" /> Paste image link
@@ -281,7 +284,7 @@ export default function TryOn() {
           {productUrl && (
             <button
               type="button"
-              onClick={() => { setProductUrl(""); resetResult(); }}
+              onClick={() => { setProductUrl(""); setUrlError(null); setUrlStatus("idle"); resetResult(); }}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
@@ -295,9 +298,10 @@ export default function TryOn() {
           <Input
             id="product-link"
             value={productUrl}
-            onChange={(e) => { setProductUrl(e.target.value); if (e.target.value) { setItemFile(null); setItemPreview(null); setItemDataUrl(null); } resetResult(); }}
+            onChange={(e) => onProductUrlChange(e.target.value)}
+            onBlur={() => checkUrl(productUrl.trim())}
             placeholder="https://example.com/product-image.jpg"
-            className="h-12 flex-1"
+            className={cn("h-12 flex-1", urlError && "border-destructive focus-visible:ring-destructive")}
             inputMode="url"
             autoComplete="off"
           />
@@ -309,9 +313,7 @@ export default function TryOn() {
               try {
                 const text = await navigator.clipboard.readText();
                 if (text) {
-                  setProductUrl(text.trim());
-                  setItemFile(null); setItemPreview(null); setItemDataUrl(null);
-                  resetResult();
+                  onProductUrlChange(text.trim());
                 }
               } catch {
                 toast.error("Clipboard unavailable — paste manually");
@@ -321,16 +323,36 @@ export default function TryOn() {
             Paste
           </Button>
         </div>
-        {/^https?:\/\//i.test(productUrl.trim()) && (
+
+        {urlError && (
+          <div className="mt-3 flex items-start gap-2 text-sm text-destructive">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{urlError}</span>
+          </div>
+        )}
+
+        {urlStatus === "checking" && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Checking if that image can be reached…
+          </div>
+        )}
+
+        {urlStatus === "reachable" && productUrl && (
           <div className="mt-3 flex items-center gap-3">
             <img
               src={productUrl.trim()}
               alt="Link preview"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               className="w-14 h-14 rounded-lg object-cover border border-border bg-background"
             />
             <span className="text-xs text-muted-foreground truncate">{productUrl.trim()}</span>
           </div>
+        )}
+
+        {urlStatus === "error" && productUrl && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tip: Some sites block direct image links. Right-click the product image, choose “Copy image address,” and paste that here.
+          </p>
         )}
       </div>
 
