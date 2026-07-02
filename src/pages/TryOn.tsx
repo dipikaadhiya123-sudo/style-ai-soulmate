@@ -72,8 +72,9 @@ export default function TryOn() {
       await isImageUrlReachable(trimmed);
       setUrlStatus("reachable");
       setUrlError(null);
-    } catch (e: any) {
-      setUrlError(e.message ?? "That link doesn't seem to work.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "That link doesn't seem to work.";
+      setUrlError(msg);
       setUrlStatus("error");
     }
   }, [validateUrlFormat, isImageUrlReachable]);
