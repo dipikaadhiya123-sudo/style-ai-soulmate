@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2, AlertCircle } from "lucide-react";
+import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2, AlertCircle, History, Trash2, Store } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,14 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import BeforeAfter from "@/components/BeforeAfter";
+import AvailabilityPanel from "@/components/AvailabilityPanel";
+import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
+import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
 
 export default function TryOn() {
   const { user } = useAuth();
+  const { history, add: addHistory, remove: removeHistory, clear: clearHistory } = useTryOnHistory(user?.id);
+  const [showAvailability, setShowAvailability] = useState(false);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
