@@ -239,9 +239,13 @@ export default function TryOn() {
     toast.success("Link copied");
   };
 
+  // Only require valid http(s) format — many product pages block hotlinking
+  // so the client-side Image() probe will fail even though the backend can
+  // scrape og:image successfully. Reachability is advisory, not a hard gate.
   const canGenerateUrl =
-    /^https?:\/\//i.test(productUrl.trim()) && validateUrlFormat(productUrl.trim()) === null && urlStatus !== "error";
+    /^https?:\/\//i.test(productUrl.trim()) && validateUrlFormat(productUrl.trim()) === null;
   const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateUrl) && !generating;
+  const canGenerateFromLink = !!photoFile && canGenerateUrl && !generating;
 
   return (
     <div className="container max-w-3xl py-10">
