@@ -191,7 +191,24 @@ export default function TryOn() {
 
       setResultUrl(data.resultUrl);
       setResultPath(data.resultPath);
-      if (data?.detected?.[0]) setDetected(data.detected[0]);
+      const det = data?.detected?.[0];
+      if (det) setDetected(det);
+
+      // Persist to local history so users can reopen this Before/After later.
+      try {
+        const beforeDataUrl = await fileToDataUrl(photoFile);
+        addHistory({
+          beforeUrl: beforeDataUrl,
+          afterUrl: data.resultUrl,
+          label: det?.label ?? "Try-on look",
+          category: det?.category,
+          sourceUrl: hasUrl ? url : undefined,
+        });
+      } catch (e) {
+        console.warn("history save skipped", e);
+      }
+
+      setShowAvailability(false);
       toast.success("Try-on ready");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate");
