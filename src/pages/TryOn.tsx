@@ -362,8 +362,23 @@ export default function TryOn() {
 
         {urlStatus === "error" && productUrl && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Tip: Some sites block direct image links. Right-click the product image, choose “Copy image address,” and paste that here.
+            Heads up: the preview couldn't load, but you can still try — we'll fetch the product image on our servers.
           </p>
+        )}
+
+        {canGenerateUrl && (
+          <Button
+            type="button"
+            onClick={generate}
+            disabled={!canGenerateFromLink}
+            className="mt-4 w-full h-12 bg-gradient-accent text-accent-foreground border-0"
+          >
+            {generating
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
+              : !photoFile
+                ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
+                : <><Sparkles className="w-4 h-4" /> Generate try-on from link</>}
+          </Button>
         )}
       </div>
 
