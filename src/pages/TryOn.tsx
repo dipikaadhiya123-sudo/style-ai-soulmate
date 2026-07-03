@@ -457,20 +457,81 @@ export default function TryOn() {
 
 
           <div className="flex flex-wrap gap-2 mt-6">
-            {!savedSlug ? (
+            {resultPath && !savedSlug ? (
               <Button onClick={save} disabled={saving} className="bg-gradient-accent text-accent-foreground border-0">
                 {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save look</>}
               </Button>
-            ) : (
+            ) : savedSlug ? (
               <Button onClick={share} variant="outline">
                 <Share2 className="w-4 h-4" /> Share
               </Button>
-            )}
+            ) : null}
             <a href={resultUrl} download="tryon.png" target="_blank" rel="noreferrer">
               <Button variant="outline"><Download className="w-4 h-4" /> Download</Button>
             </a>
+            <Button variant="outline" onClick={() => setShowAvailability((s) => !s)}>
+              <Store className="w-4 h-4" /> {showAvailability ? "Hide stores" : "Find in stores"}
+            </Button>
           </div>
+
+          {showAvailability && detected?.label && (
+            <div className="mt-6 space-y-4">
+              <AvailabilityPanel
+                query={detected.label}
+                category={detected.category}
+                retailers={retailerList(detected.label)}
+              />
+              <RetailerFallback query={detected.label} title="Not seeing it? Search retailers directly" />
+            </div>
+          )}
         </motion.div>
+      )}
+
+      {history.length > 0 && (
+        <section className="mt-12">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-accent" />
+              <h2 className="font-display text-xl font-medium">Recent try-ons</h2>
+              <span className="text-xs text-muted-foreground">({history.length})</span>
+            </div>
+            <button
+              onClick={() => { if (confirm("Clear all try-on history?")) clearHistory(); }}
+              className="text-xs text-muted-foreground hover:text-destructive"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {history.map((h) => (
+              <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-border bg-background">
+                <button onClick={() => restoreFromHistory(h.id)} className="block w-full text-left">
+                  <div className="grid grid-cols-2 aspect-[8/5]">
+                    <img src={h.beforeUrl} alt="Before" className="w-full h-full object-cover" />
+                    <img src={h.afterUrl} alt="After" className="w-full h-full object-cover"
+                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.35"; }} />
+                  </div>
+                  <div className="px-3 py-2">
+                    <div className="text-xs font-medium truncate">{h.label}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {new Date(h.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => removeHistory(h.id)}
+                  aria-label="Remove"
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/90 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            History is saved on this device. Result images may expire after ~1 hour — save a look to keep it forever.
+          </p>
+        </section>
       )}
     </div>
   );
