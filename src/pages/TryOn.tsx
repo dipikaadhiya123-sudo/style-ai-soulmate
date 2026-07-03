@@ -251,6 +251,19 @@ export default function TryOn() {
     }
   };
 
+  const restoreFromHistory = (id: string) => {
+    const entry = history.find((h) => h.id === id);
+    if (!entry) return;
+    setPhotoPreview(entry.beforeUrl);
+    setResultUrl(entry.afterUrl);
+    setResultPath(null); // can't re-save; only view
+    setSavedSlug(null);
+    setDetected(entry.label ? { label: entry.label, category: entry.category ?? "clothes" } : null);
+    if (entry.sourceUrl) setProductUrl(entry.sourceUrl);
+    setShowAvailability(false);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  };
+
   const share = async () => {
     if (!savedSlug) return;
     const url = `${window.location.origin}/look/${savedSlug}`;
