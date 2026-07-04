@@ -475,15 +475,20 @@ export default function TryOn() {
 
 
           <div className="flex flex-wrap gap-2 mt-6">
-            {resultPath && !savedSlug ? (
-              <Button onClick={save} disabled={saving} className="bg-gradient-accent text-accent-foreground border-0">
-                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save look</>}
+            <Button
+              onClick={share}
+              disabled={saving || (!resultPath && !resultUrl)}
+              className="bg-gradient-accent text-accent-foreground border-0"
+            >
+              {saving
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing link…</>
+                : <><Share2 className="w-4 h-4" /> Share</>}
+            </Button>
+            {resultPath && !savedSlug && (
+              <Button onClick={() => save()} disabled={saving} variant="outline">
+                <Save className="w-4 h-4" /> Save look
               </Button>
-            ) : savedSlug ? (
-              <Button onClick={share} variant="outline">
-                <Share2 className="w-4 h-4" /> Share
-              </Button>
-            ) : null}
+            )}
             <a href={resultUrl} download="tryon.png" target="_blank" rel="noreferrer">
               <Button variant="outline"><Download className="w-4 h-4" /> Download</Button>
             </a>
