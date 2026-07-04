@@ -89,7 +89,13 @@ Deno.serve(async (req) => {
       if (it.imageUrl || !it.productUrl) continue;
       try {
         let img: string | undefined;
-        if (FIRECRAWL_API_KEY) {
+
+        // If the URL is already a direct image, use it as-is (Pinterest CDN etc.)
+        if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(it.productUrl!)) {
+          img = it.productUrl;
+        }
+
+        if (!img && FIRECRAWL_API_KEY) {
           const fc = await fetch("https://api.firecrawl.dev/v2/scrape", {
             method: "POST",
             headers: {
@@ -98,29 +104,40 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               url: it.productUrl,
-              formats: ["markdown"],
-              onlyMainContent: true,
+              formats: ["markdown", "html"],
+              onlyMainContent: false,
+              waitFor: 1500,
             }),
           });
           if (fc.ok) {
             const d = await fc.json();
             const meta = d?.data?.metadata ?? d?.metadata ?? {};
-            img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"];
+            img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
+            const html: string = d?.data?.html ?? d?.html ?? "";
+            if (!img && html) img = extractImageFromHtml(html);
           } else {
             console.error("firecrawl scrape error", fc.status, await fc.text());
           }
         }
+
         if (!img) {
-          // Fallback: fetch the page HTML and extract og:image
-          const html = await fetch(it.productUrl, {
-            headers: { "User-Agent": "Mozilla/5.0 (compatible; StyleAI/1.0)" },
-          }).then((r) => (r.ok ? r.text() : ""));
-          const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-                 || html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-          if (m) img = m[1];
+          // Fallback: fetch the page HTML directly and extract image
+          const html = await fetch(it.productUrl!, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+              Accept: "text/html,application/xhtml+xml",
+            },
+          }).then((r) => (r.ok ? r.text() : "")).catch(() => "");
+          if (html) img = extractImageFromHtml(html);
         }
+
+        // Resolve protocol-relative or root-relative URLs against product page
+        if (img && it.productUrl) {
+          try { img = new URL(img, it.productUrl).toString(); } catch { /* keep as-is */ }
+        }
+
         if (img) it.imageUrl = img;
-        else return json({ error: "Couldn't read product image from that link" }, 400);
+        else return json({ error: "Couldn't read product image from that link. Try copying the direct image address instead." }, 400);
       } catch (e) {
         console.error("productUrl fetch failed", e);
         return json({ error: "Couldn't read product link" }, 400);
