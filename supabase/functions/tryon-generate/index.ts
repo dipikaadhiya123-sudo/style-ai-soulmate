@@ -355,3 +355,48 @@ function json(b: any, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+// Try many common patterns to find a product/hero image in raw HTML.
+// Covers og:image, twitter:image, link rel=image_src, JSON-LD image, and
+// falls back to the first large-looking <img> src.
+function extractImageFromHtml(html: string): string | undefined {
+  const patterns = [
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+    /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) return decodeHtml(m[1]);
+  }
+  // JSON-LD image field
+  const ld = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (ld?.[1]) {
+    try {
+      const j = JSON.parse(ld[1].trim());
+      const arr = Array.isArray(j) ? j : [j];
+      for (const node of arr) {
+        const im = node?.image;
+        if (typeof im === "string") return decodeHtml(im);
+        if (Array.isArray(im) && typeof im[0] === "string") return decodeHtml(im[0]);
+        if (im?.url) return decodeHtml(String(im.url));
+      }
+    } catch { /* ignore */ }
+  }
+  // First <img> with a plausible product source
+  const imgs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+  for (const m of imgs) {
+    const src = m[1];
+    if (/\.(jpe?g|png|webp|avif)(\?|#|$)/i.test(src) && !/(logo|sprite|icon|placeholder|pixel|blank)/i.test(src)) {
+      return decodeHtml(src);
+    }
+  }
+  return undefined;
+}
+
+function decodeHtml(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&#x2F;/g, "/").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+}
