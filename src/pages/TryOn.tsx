@@ -217,8 +217,8 @@ export default function TryOn() {
     }
   };
 
-  const save = async () => {
-    if (!user || !resultPath || !photoPath) return;
+  const save = async (opts?: { silent?: boolean }): Promise<string | null> => {
+    if (!user || !resultPath || !photoPath) return null;
     setSaving(true);
     try {
       const cat = detected?.category ?? "clothes";
@@ -243,9 +243,11 @@ export default function TryOn() {
         .single();
       if (error) throw error;
       setSavedSlug(data.share_slug);
-      toast.success("Saved to your lookbook");
+      if (!opts?.silent) toast.success("Saved to your lookbook");
+      return data.share_slug as string;
     } catch (e: any) {
       toast.error(e?.message ?? "Save failed");
+      return null;
     } finally {
       setSaving(false);
     }
