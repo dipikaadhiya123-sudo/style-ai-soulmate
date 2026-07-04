@@ -81,21 +81,21 @@ Deno.serve(async (req) => {
       return json({ error: "Provide at least one item image, link, or description" }, 400);
     }
 
-    // If a productUrl was supplied (e.g. Myntra/Amazon link), scrape the page
-    // server-side and extract the main product image. Uses Firecrawl when
-    // available; falls back to a lightweight HTML parse for og:image.
+    // Resolve pasted product links (Myntra/Ajio/Amazon/Pinterest/Instagram) or
+    // plain product names into a usable reference image server-side.
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     for (const it of items) {
-      if (it.imageUrl || !it.productUrl) continue;
+      if (it.imageUrl) continue;
       try {
         let img: string | undefined;
+        const query = it.label?.trim();
 
         // If the URL is already a direct image, use it as-is (Pinterest CDN etc.)
-        if (/\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(it.productUrl!)) {
+        if (it.productUrl && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(it.productUrl)) {
           img = it.productUrl;
         }
 
-        if (!img && FIRECRAWL_API_KEY) {
+        if (!img && it.productUrl && FIRECRAWL_API_KEY) {
           const fc = await fetch("https://api.firecrawl.dev/v2/scrape", {
             method: "POST",
             headers: {
@@ -120,9 +120,9 @@ Deno.serve(async (req) => {
           }
         }
 
-        if (!img) {
+        if (!img && it.productUrl) {
           // Fallback: fetch the page HTML directly and extract image
-          const html = await fetch(it.productUrl!, {
+          const html = await fetch(it.productUrl, {
             headers: {
               "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
               Accept: "text/html,application/xhtml+xml",
@@ -136,11 +136,15 @@ Deno.serve(async (req) => {
           try { img = new URL(img, it.productUrl).toString(); } catch { /* keep as-is */ }
         }
 
+        if (!img && query) {
+          img = await findProductImage(query, FIRECRAWL_API_KEY);
+        }
+
         if (img) it.imageUrl = img;
-        else return json({ error: "Couldn't read product image from that link. Try copying the direct image address instead." }, 400);
+        else return json({ error: "Couldn't find a product image. Paste a product page/image link or a clearer product name." }, 400);
       } catch (e) {
         console.error("productUrl fetch failed", e);
-        return json({ error: "Couldn't read product link" }, 400);
+        return json({ error: "Couldn't read that product. Try a direct product link, image link, or clearer product name." }, 400);
       }
     }
 
@@ -399,4 +403,58 @@ function extractImageFromHtml(html: string): string | undefined {
 
 function decodeHtml(s: string): string {
   return s.replace(/&amp;/g, "&").replace(/&#x2F;/g, "/").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+}
+
+async function findProductImage(query: string, firecrawlKey?: string): Promise<string | undefined> {
+  const searchQuery = `${query} fashion product image`;
+
+  if (firecrawlKey) {
+    try {
+      const r = await fetch("https://api.firecrawl.dev/v2/search", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${firecrawlKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          limit: 5,
+          scrapeOptions: { formats: ["html"], onlyMainContent: false },
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const rows = Array.isArray(d?.data) ? d.data : Array.isArray(d?.web) ? d.web : [];
+        for (const row of rows) {
+          const meta = row?.metadata ?? {};
+          let img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
+          if (!img && row?.html) img = extractImageFromHtml(String(row.html));
+          if (img) {
+            try { return new URL(String(img), row?.url).toString(); } catch { return String(img); }
+          }
+        }
+      } else {
+        console.error("firecrawl search error", r.status, await r.text());
+      }
+    } catch (e) {
+      console.error("firecrawl search threw", e);
+    }
+  }
+
+  try {
+    const url = `https://api.openverse.org/v1/images/?${new URLSearchParams({
+      q: searchQuery,
+      page_size: "1",
+      license_type: "all",
+      mature: "false",
+    })}`;
+    const r = await fetch(url, { headers: { "User-Agent": "Lovable-TryOn/1.0" } });
+    if (!r.ok) return undefined;
+    const d = await r.json();
+    const first = d?.results?.find((it: any) => it?.url || it?.thumbnail);
+    return first?.url ?? first?.thumbnail;
+  } catch (e) {
+    console.error("openverse fallback failed", e);
+    return undefined;
+  }
 }
