@@ -35,8 +35,17 @@ export default function TryOn() {
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
 
-  const validateUrlFormat = useCallback((url: string) => {
-    if (!url) return null;
+  const extractHttpUrl = useCallback((value: string) => {
+    const match = value.match(/https?:\/\/[^\s<>'"]+/i);
+    return match?.[0]?.replace(/[),.;]+$/, "") ?? null;
+  }, []);
+
+  const validateProductInput = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const url = extractHttpUrl(trimmed);
+    if (!url && /^www\./i.test(trimmed)) return "Link must start with https://";
+    if (!url) return trimmed.length >= 3 ? null : "Enter a product link or product name.";
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -46,7 +55,7 @@ export default function TryOn() {
     } catch {
       return "Please enter a valid URL, e.g. https://example.com/image.jpg";
     }
-  }, []);
+  }, [extractHttpUrl]);
 
   const isImageUrlReachable = useCallback((url: string): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -65,16 +74,28 @@ export default function TryOn() {
       setUrlStatus("idle");
       return;
     }
-    const formatError = validateUrlFormat(trimmed);
+    const formatError = validateProductInput(trimmed);
     if (formatError) {
       setUrlError(formatError);
       setUrlStatus("error");
       return;
     }
+    const extractedUrl = extractHttpUrl(trimmed);
+    if (!extractedUrl) {
+      setUrlError(null);
+      setUrlStatus("idle");
+      return;
+    }
+    const isDirectImage = /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(extractedUrl);
+    if (!isDirectImage) {
+      setUrlError(null);
+      setUrlStatus("idle");
+      return;
+    }
     setUrlStatus("checking");
     setUrlError(null);
     try {
-      await isImageUrlReachable(trimmed);
+      await isImageUrlReachable(extractedUrl);
       setUrlStatus("reachable");
       setUrlError(null);
     } catch (e: unknown) {
@@ -82,7 +103,7 @@ export default function TryOn() {
       setUrlError(msg);
       setUrlStatus("error");
     }
-  }, [validateUrlFormat, isImageUrlReachable]);
+  }, [validateProductInput, extractHttpUrl, isImageUrlReachable]);
 
   const urlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -141,31 +162,19 @@ export default function TryOn() {
   const generate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add your photo.");
-    const url = productUrl.trim();
-    const hasUrl = /^https?:\/\//i.test(url);
-    if (!itemDataUrl && !hasUrl) return toast.error("Add the product photo or paste a link.");
+    const productInput = productUrl.trim();
+    const url = extractHttpUrl(productInput);
+    const inputError = productInput ? validateProductInput(productInput) : null;
+    const hasProductInput = !!productInput && !inputError;
+    if (!itemDataUrl && !hasProductInput) return toast.error("Add the product photo, paste a link, or type the product name.");
 
-    if (hasUrl && !itemDataUrl) {
-      const formatError = validateUrlFormat(url);
-      if (formatError) {
-        setUrlError(formatError);
+    if (productInput && !itemDataUrl) {
+      if (inputError) {
+        setUrlError(inputError);
         setUrlStatus("error");
-        return toast.error(formatError);
+        return toast.error(inputError);
       }
-      if (urlStatus === "error" && urlError) {
-        return toast.error(urlError);
-      }
-      setUrlStatus("checking");
-      try {
-        await isImageUrlReachable(url);
-        setUrlStatus("reachable");
-        setUrlError(null);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "That image link is unreachable.";
-        setUrlError(msg);
-        setUrlStatus("error");
-        return toast.error(msg);
-      }
+      setUrlError(null);
     }
 
     setGenerating(true);
@@ -181,7 +190,13 @@ export default function TryOn() {
 
       const item: Record<string, string> = {};
       if (itemDataUrl) item.imageUrl = itemDataUrl;
-      else if (hasUrl) item.productUrl = url;
+      else if (url) {
+        item.productUrl = url;
+        const pastedLabel = productInput.replace(url, "").trim();
+        if (pastedLabel) item.label = pastedLabel;
+      } else if (productInput) {
+        item.label = productInput;
+      }
 
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: { photoPath: path, items: [item] },
@@ -200,9 +215,9 @@ export default function TryOn() {
         addHistory({
           beforeUrl: beforeDataUrl,
           afterUrl: data.resultUrl,
-          label: det?.label ?? "Try-on look",
+          label: det?.label ?? (productInput && !url ? productInput : "Try-on look"),
           category: det?.category,
-          sourceUrl: hasUrl ? url : undefined,
+          sourceUrl: url ?? undefined,
         });
       } catch (e) {
         console.warn("history save skipped", e);
@@ -292,13 +307,11 @@ export default function TryOn() {
     toast.success("Share link copied");
   };
 
-  // Only require valid http(s) format — many product pages block hotlinking
-  // so the client-side Image() probe will fail even though the backend can
-  // scrape og:image successfully. Reachability is advisory, not a hard gate.
-  const canGenerateUrl =
-    /^https?:\/\//i.test(productUrl.trim()) && validateUrlFormat(productUrl.trim()) === null;
-  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateUrl) && !generating;
-  const canGenerateFromLink = !!photoFile && canGenerateUrl && !generating;
+  const productInput = productUrl.trim();
+  const extractedProductUrl = extractHttpUrl(productInput);
+  const canGenerateProductInput = productInput.length > 0 && validateProductInput(productInput) === null;
+  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateProductInput) && !generating;
+  const canGenerateFromLink = !!photoFile && canGenerateProductInput && !generating;
 
   return (
     <div className="container max-w-3xl py-10">
@@ -338,7 +351,7 @@ export default function TryOn() {
       )}>
         <div className="flex items-center justify-between mb-2">
           <label htmlFor="product-link" className="text-sm font-medium flex items-center gap-2">
-            <Link2 className="w-4 h-4 text-accent" /> Paste image link
+            <Link2 className="w-4 h-4 text-accent" /> Paste link or product name
           </label>
           {productUrl && (
             <button
@@ -351,7 +364,7 @@ export default function TryOn() {
           )}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Paste any product or image URL (Myntra, Amazon, Zara, or a direct .jpg/.png link).
+          Paste a product page link, Instagram/Pinterest image link, or just the product name.
         </p>
         <div className="flex gap-2">
           <Input
@@ -359,7 +372,7 @@ export default function TryOn() {
             value={productUrl}
             onChange={(e) => onProductUrlChange(e.target.value)}
             onBlur={() => checkUrl(productUrl.trim())}
-            placeholder="https://example.com/product-image.jpg"
+            placeholder="Myntra/Ajio link or A-line dress"
             className={cn("h-12 flex-1", urlError && "border-destructive focus-visible:ring-destructive")}
             inputMode="url"
             autoComplete="off"
@@ -397,10 +410,10 @@ export default function TryOn() {
           </div>
         )}
 
-        {urlStatus === "reachable" && productUrl && (
+        {urlStatus === "reachable" && extractedProductUrl && (
           <div className="mt-3 flex items-center gap-3">
             <img
-              src={productUrl.trim()}
+              src={extractedProductUrl}
               alt="Link preview"
               referrerPolicy="no-referrer"
               onError={() => {
@@ -409,17 +422,17 @@ export default function TryOn() {
               }}
               className="w-14 h-14 rounded-lg object-cover border border-border bg-background"
             />
-            <span className="text-xs text-muted-foreground truncate">{productUrl.trim()}</span>
+            <span className="text-xs text-muted-foreground truncate">{extractedProductUrl}</span>
           </div>
         )}
 
-        {urlStatus === "error" && productUrl && (
+        {urlStatus === "error" && extractedProductUrl && (
           <p className="mt-3 text-xs text-muted-foreground">
             Heads up: the preview couldn't load, but you can still try — we'll fetch the product image on our servers.
           </p>
         )}
 
-        {canGenerateUrl && (
+        {canGenerateProductInput && (
           <Button
             type="button"
             onClick={generate}
@@ -430,7 +443,7 @@ export default function TryOn() {
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
               : !photoFile
                 ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
-                : <><Sparkles className="w-4 h-4" /> Generate try-on from link</>}
+                : <><Sparkles className="w-4 h-4" /> Generate try-on</>}
           </Button>
         )}
       </div>
