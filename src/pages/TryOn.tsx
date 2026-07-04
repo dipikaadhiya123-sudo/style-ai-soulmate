@@ -265,13 +265,29 @@ export default function TryOn() {
   };
 
   const share = async () => {
-    if (!savedSlug) return;
-    const url = `${window.location.origin}/look/${savedSlug}`;
+    let slug = savedSlug;
+    if (!slug) {
+      if (!resultPath) {
+        // Result expired or came from history — share the after-image URL directly.
+        if (!resultUrl) return toast.error("Nothing to share yet");
+        if (navigator.share) {
+          try { await navigator.share({ title: detected?.label ?? "My try-on", url: resultUrl }); return; } catch {}
+        }
+        await navigator.clipboard.writeText(resultUrl);
+        toast.success("Image link copied");
+        return;
+      }
+      // Auto-save first so we get a real public share slug.
+      const s = await save({ silent: true });
+      if (!s) return;
+      slug = s;
+    }
+    const url = `${window.location.origin}/look/${slug}`;
     if (navigator.share) {
       try { await navigator.share({ title: detected?.label ?? "My try-on", url }); return; } catch {}
     }
     await navigator.clipboard.writeText(url);
-    toast.success("Link copied");
+    toast.success("Share link copied");
   };
 
   // Only require valid http(s) format — many product pages block hotlinking
