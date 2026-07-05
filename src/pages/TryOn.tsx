@@ -201,7 +201,21 @@ export default function TryOn() {
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: { photoPath: path, items: [item] },
       });
-      if (error) throw error;
+      if (error) {
+        // supabase-js swallows the response body into error.context (a Response).
+        // Parse it so we can show the real backend reason instead of "non-2xx status code".
+        let backendMsg: string | undefined;
+        let backendStatus: number | undefined;
+        try {
+          const res: Response | undefined = (error as { context?: Response }).context;
+          if (res && typeof res.json === "function") {
+            backendStatus = res.status;
+            const body = await res.clone().json().catch(() => null);
+            backendMsg = body?.error || body?.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(backendMsg ? `${backendMsg}${backendStatus ? ` (HTTP ${backendStatus})` : ""}` : (error.message || "Try-on request failed"));
+      }
       if (data?.error) throw new Error(data.error);
 
       setResultUrl(data.resultUrl);
@@ -456,16 +470,38 @@ export default function TryOn() {
       <input ref={itemInput} type="file" accept="image/*" className="hidden"
         onChange={e => e.target.files?.[0] && onItem(e.target.files[0])} />
 
-      <Button
-        onClick={generate}
-        disabled={!canGenerate}
-        size="lg"
-        className="w-full bg-gradient-accent text-accent-foreground border-0 mb-10 h-14 text-base"
-      >
-        {generating
-          ? <><Loader2 className="w-5 h-5 animate-spin" /> Rendering your try-on…</>
-          : <><Sparkles className="w-5 h-5" /> Try it on</>}
-      </Button>
+      {/* Debug panel: shows how the pasted input is classified and what the backend resolved. */}
+      {(productInput || itemDataUrl || detected) && (
+        <div className="rounded-xl border border-border bg-muted/30 p-3 mb-6 text-xs font-mono space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Debug</div>
+          <div>Photo: <span className="text-foreground">{photoFile ? `${photoFile.name} (${Math.round(photoFile.size/1024)}KB)` : "—"}</span></div>
+          <div>Garment source: <span className="text-foreground">
+            {itemDataUrl ? "uploaded image" : extractedProductUrl ? "pasted URL" : productInput ? "product name (search)" : "—"}
+          </span></div>
+          {extractedProductUrl && <div className="truncate">URL → <span className="text-accent">{extractedProductUrl}</span></div>}
+          {!extractedProductUrl && productInput && <div>Query → <span className="text-accent">{productInput}</span></div>}
+          {detected && <div>Backend resolved → <span className="text-accent">{detected.category}</span> · {detected.label}</div>}
+          {resultPath && <div className="truncate">Result path → <span className="text-accent">{resultPath}</span></div>}
+        </div>
+      )}
+
+      {/* Single unified generate action — shows whenever a garment upload is present
+          (the paste card has its own button for the URL/name flow). */}
+      {itemDataUrl && (
+        <Button
+          onClick={generate}
+          disabled={!canGenerate}
+          size="lg"
+          className="w-full bg-gradient-accent text-accent-foreground border-0 mb-10 h-14 text-base"
+        >
+          {generating
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Rendering your try-on…</>
+            : !photoFile
+              ? <><Sparkles className="w-5 h-5" /> Add your photo to generate</>
+              : <><Sparkles className="w-5 h-5" /> Generate try-on</>}
+        </Button>
+      )}
+
 
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
