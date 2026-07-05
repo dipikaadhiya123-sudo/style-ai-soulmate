@@ -485,6 +485,23 @@ export default function TryOn() {
         </div>
       )}
 
+      {/* Single unified generate action — shows whenever a garment upload is present
+          (the paste card has its own button for the URL/name flow). */}
+      {itemDataUrl && (
+        <Button
+          onClick={generate}
+          disabled={!canGenerate}
+          size="lg"
+          className="w-full bg-gradient-accent text-accent-foreground border-0 mb-10 h-14 text-base"
+        >
+          {generating
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Rendering your try-on…</>
+            : !photoFile
+              ? <><Sparkles className="w-5 h-5" /> Add your photo to generate</>
+              : <><Sparkles className="w-5 h-5" /> Generate try-on</>}
+        </Button>
+      )}
+
 
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
