@@ -137,14 +137,36 @@ Deno.serve(async (req) => {
         }
 
         if (!img && query) {
+          if (!FIRECRAWL_API_KEY) {
+            return json({
+              success: false,
+              code: "PRODUCT_SEARCH_NOT_CONFIGURED",
+              error: "Product-name search needs a search provider. Paste the product page link or upload the garment image.",
+            }, 400);
+          }
           img = await findProductImage(query, FIRECRAWL_API_KEY);
+          if (!img) {
+            return json({
+              success: false,
+              code: "PRODUCT_IMAGE_NOT_FOUND",
+              error: "No usable product image was found. Try the exact product page link or upload the garment image.",
+            }, 404);
+          }
         }
 
         if (img) it.imageUrl = img;
-        else return json({ error: "Couldn't find a product image. Paste a product page/image link or a clearer product name." }, 400);
+        else return json({
+          success: false,
+          code: "PRODUCT_IMAGE_NOT_FOUND",
+          error: "Couldn't find a product image. Paste a product page/image link or upload the garment image.",
+        }, 404);
       } catch (e) {
         console.error("productUrl fetch failed", e);
-        return json({ error: "Couldn't read that product. Try a direct product link, image link, or clearer product name." }, 400);
+        return json({
+          success: false,
+          code: "PRODUCT_FETCH_FAILED",
+          error: "Couldn't read that product. Try a direct product link, image link, or upload the garment image.",
+        }, 400);
       }
     }
 
