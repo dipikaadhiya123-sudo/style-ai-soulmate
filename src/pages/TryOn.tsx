@@ -470,10 +470,10 @@ export default function TryOn() {
       <input ref={itemInput} type="file" accept="image/*" className="hidden"
         onChange={e => e.target.files?.[0] && onItem(e.target.files[0])} />
 
-      {/* Debug panel: shows how the pasted input is classified and what the backend resolved. */}
-      {(productInput || itemDataUrl || detected) && (
+      {/* Dev-only diagnostic panel (hidden in production builds). */}
+      {import.meta.env.DEV && (productInput || itemDataUrl || detected) && (
         <div className="rounded-xl border border-border bg-muted/30 p-3 mb-6 text-xs font-mono space-y-1">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Debug</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Debug (dev only)</div>
           <div>Photo: <span className="text-foreground">{photoFile ? `${photoFile.name} (${Math.round(photoFile.size/1024)}KB)` : "—"}</span></div>
           <div>Garment source: <span className="text-foreground">
             {itemDataUrl ? "uploaded image" : extractedProductUrl ? "pasted URL" : productInput ? "product name (search)" : "—"}
@@ -481,7 +481,6 @@ export default function TryOn() {
           {extractedProductUrl && <div className="truncate">URL → <span className="text-accent">{extractedProductUrl}</span></div>}
           {!extractedProductUrl && productInput && <div>Query → <span className="text-accent">{productInput}</span></div>}
           {detected && <div>Backend resolved → <span className="text-accent">{detected.category}</span> · {detected.label}</div>}
-          {resultPath && <div className="truncate">Result path → <span className="text-accent">{resultPath}</span></div>}
         </div>
       )}
 
