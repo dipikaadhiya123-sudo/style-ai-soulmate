@@ -201,7 +201,21 @@ export default function TryOn() {
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: { photoPath: path, items: [item] },
       });
-      if (error) throw error;
+      if (error) {
+        // supabase-js swallows the response body into error.context (a Response).
+        // Parse it so we can show the real backend reason instead of "non-2xx status code".
+        let backendMsg: string | undefined;
+        let backendStatus: number | undefined;
+        try {
+          const res: Response | undefined = (error as { context?: Response }).context;
+          if (res && typeof res.json === "function") {
+            backendStatus = res.status;
+            const body = await res.clone().json().catch(() => null);
+            backendMsg = body?.error || body?.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(backendMsg ? `${backendMsg}${backendStatus ? ` (HTTP ${backendStatus})` : ""}` : (error.message || "Try-on request failed"));
+      }
       if (data?.error) throw new Error(data.error);
 
       setResultUrl(data.resultUrl);
