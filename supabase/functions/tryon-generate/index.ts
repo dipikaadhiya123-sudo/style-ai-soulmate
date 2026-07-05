@@ -427,56 +427,107 @@ function decodeHtml(s: string): string {
   return s.replace(/&amp;/g, "&").replace(/&#x2F;/g, "/").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
 }
 
-async function findProductImage(query: string, firecrawlKey?: string): Promise<string | undefined> {
-  const searchQuery = `${query} fashion product image`;
+// Normalize a product-name query while preserving brand + model info.
+function normalizeQuery(q: string): string {
+  return q.replace(/\s+/g, " ").trim().slice(0, 180);
+}
 
-  if (firecrawlKey) {
-    try {
-      const r = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${firecrawlKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          limit: 5,
-          scrapeOptions: { formats: ["html"], onlyMainContent: false },
-        }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        const rows = Array.isArray(d?.data) ? d.data : Array.isArray(d?.web) ? d.web : [];
-        for (const row of rows) {
-          const meta = row?.metadata ?? {};
-          let img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
-          if (!img && row?.html) img = extractImageFromHtml(String(row.html));
-          if (img) {
-            try { return new URL(String(img), row?.url).toString(); } catch { return String(img); }
-          }
-        }
-      } else {
-        console.error("firecrawl search error", r.status, await r.text());
+const REJECT_HOST_PATTERNS = /(favicon|sprite|logo|placeholder|pixel|tracking|doubleclick|googletag|analytics)/i;
+const REJECT_PATH_PATTERNS = /(favicon|sprite|logo|placeholder|blank|pixel|1x1|thumb_?(?:16|24|32|48|64))/i;
+
+// HEAD-check a candidate image. Return true if it looks like a real product image.
+async function validateImageCandidate(url: string): Promise<{ ok: boolean; reason?: string; host?: string }> {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return { ok: false, reason: "invalid-url" }; }
+  if (!/^https?:$/.test(parsed.protocol)) return { ok: false, reason: "bad-protocol", host: parsed.hostname };
+  if (REJECT_HOST_PATTERNS.test(parsed.hostname) || REJECT_PATH_PATTERNS.test(parsed.pathname)) {
+    return { ok: false, reason: "blocklisted-pattern", host: parsed.hostname };
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    let head = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" }).catch(() => null);
+    clearTimeout(timer);
+    // Some CDNs reject HEAD — fall back to a ranged GET.
+    if (!head || !head.ok) {
+      const c2 = new AbortController();
+      const t2 = setTimeout(() => c2.abort(), 4000);
+      head = await fetch(url, { method: "GET", headers: { Range: "bytes=0-2048" }, signal: c2.signal, redirect: "follow" }).catch(() => null);
+      clearTimeout(t2);
+    }
+    if (!head || !head.ok) return { ok: false, reason: `unreachable-${head?.status ?? "net"}`, host: parsed.hostname };
+    const ct = head.headers.get("content-type") ?? "";
+    if (!/^image\//i.test(ct)) return { ok: false, reason: `bad-mime-${ct || "none"}`, host: parsed.hostname };
+    const len = Number(head.headers.get("content-length") ?? "0");
+    if (len && len < 4000) return { ok: false, reason: `too-small-${len}`, host: parsed.hostname };
+    return { ok: true, host: parsed.hostname };
+  } catch (e) {
+    return { ok: false, reason: `error-${(e as Error).message}`, host: parsed.hostname };
+  }
+}
+
+async function findProductImage(query: string, firecrawlKey?: string): Promise<string | undefined> {
+  if (!firecrawlKey) {
+    console.log("[product-search] no firecrawl key configured");
+    return undefined;
+  }
+  const normalized = normalizeQuery(query);
+  console.log("[product-search] query:", normalized);
+
+  const candidates: { url: string; source: string }[] = [];
+
+  // Firecrawl v2 supports multi-source search: web + images. Image source returns
+  // direct image URLs from Google/Bing image search without needing to scrape
+  // retailer pages (which usually block scrapers or return login walls).
+  try {
+    const r = await fetch("https://api.firecrawl.dev/v2/search", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${firecrawlKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: normalized,
+        sources: ["images", "web"],
+        limit: 10,
+      }),
+    });
+    console.log("[product-search] firecrawl status:", r.status);
+    if (r.ok) {
+      const d = await r.json();
+      const payload = d?.data ?? d;
+      const imgs: any[] = Array.isArray(payload?.images) ? payload.images : [];
+      const webs: any[] = Array.isArray(payload?.web) ? payload.web : Array.isArray(payload?.data) ? payload.data : [];
+      console.log("[product-search] candidates: images=", imgs.length, "web=", webs.length);
+
+      for (const it of imgs) {
+        const u = it?.imageUrl || it?.url || it?.src;
+        if (typeof u === "string") candidates.push({ url: u, source: "image-search" });
       }
-    } catch (e) {
-      console.error("firecrawl search threw", e);
+      for (const row of webs) {
+        const meta = row?.metadata ?? {};
+        const u = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
+        if (typeof u === "string") {
+          try { candidates.push({ url: new URL(u, row?.url).toString(), source: "web-og" }); }
+          catch { candidates.push({ url: u, source: "web-og" }); }
+        }
+      }
+    } else {
+      console.error("[product-search] firecrawl error body:", (await r.text()).slice(0, 400));
+    }
+  } catch (e) {
+    console.error("[product-search] firecrawl threw:", (e as Error).message);
+  }
+
+  console.log("[product-search] total candidates:", candidates.length);
+
+  for (const c of candidates) {
+    const v = await validateImageCandidate(c.url);
+    if (v.ok) {
+      console.log("[product-search] selected:", v.host, "via", c.source);
+      return c.url;
+    } else {
+      console.log("[product-search] rejected", v.host ?? "?", "→", v.reason);
     }
   }
 
-  try {
-    const url = `https://api.openverse.org/v1/images/?${new URLSearchParams({
-      q: searchQuery,
-      page_size: "1",
-      license_type: "all",
-      mature: "false",
-    })}`;
-    const r = await fetch(url, { headers: { "User-Agent": "Lovable-TryOn/1.0" } });
-    if (!r.ok) return undefined;
-    const d = await r.json();
-    const first = d?.results?.find((it: any) => it?.url || it?.thumbnail);
-    return first?.url ?? first?.thumbnail;
-  } catch (e) {
-    console.error("openverse fallback failed", e);
-    return undefined;
-  }
+  console.log("[product-search] no valid candidate found");
+  return undefined;
 }
