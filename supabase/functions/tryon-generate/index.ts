@@ -529,68 +529,330 @@ async function validateImageCandidate(url: string): Promise<{ ok: boolean; reaso
   }
 }
 
-async function findProductImage(query: string, firecrawlKey?: string): Promise<string | undefined> {
-  if (!firecrawlKey) {
-    console.log("[product-search] no firecrawl key configured");
-    return undefined;
+// ---------- Product-matching pipeline ----------
+
+const CATEGORY_WORDS: Record<string, string[]> = {
+  dress: ["dress","gown","frock"],
+  top: ["top","tee","t-shirt","tshirt","shirt","blouse","kurta","kurti","tunic","cami","camisole"],
+  bottom: ["jeans","pants","trousers","shorts","skirt","leggings","joggers","chinos","palazzo"],
+  outerwear: ["jacket","coat","blazer","cardigan","hoodie","sweater","sweatshirt","parka"],
+  jumpsuit: ["jumpsuit","romper","playsuit","dungaree"],
+  ethnic: ["saree","lehenga","salwar","anarkali","dupatta","sherwani"],
+  footwear: ["sneakers","shoes","boots","sandals","heels","flats","loafers","mules","pumps","slippers"],
+  bag: ["bag","handbag","clutch","backpack","tote","sling","satchel","wallet","purse"],
+  jewelry: ["necklace","earrings","ring","bracelet","bangle","pendant","choker"],
+  accessory: ["watch","sunglasses","glasses","hat","cap","scarf","belt","tie"],
+};
+const COLOR_WORDS = [
+  "red","blue","green","yellow","black","white","pink","purple","orange","brown","beige",
+  "cream","navy","maroon","burgundy","olive","teal","turquoise","gold","silver","grey","gray",
+  "ivory","tan","khaki","mustard","coral","lavender","peach","rose","wine","charcoal","nude",
+];
+const LENGTH_WORDS = ["mini","midi","maxi","knee-length","ankle-length","cropped","full-length","calf-length","short","long","knee","ankle"];
+const SILHOUETTE_WORDS = [
+  "a-line","a line","aline","bodycon","fit-and-flare","fit and flare","sheath","shift","wrap",
+  "empire","peplum","mermaid","trumpet","column","skater","pencil","straight","flared",
+  "bootcut","boot-cut","skinny","slim","relaxed","oversized","tailored","boxy",
+  "one-shoulder","one shoulder","off-shoulder","off shoulder","strapless","halter","backless",
+  "cut-out","cutout","draped","asymmetric","tiered","ruched","pleated","party",
+];
+const GENDER_WORDS = ["women","womens","woman","men","mens","man","girl","boy","kids","unisex","ladies","girls","boys"];
+const NEGATIVE_CONTEXT = /(related|recommend|you[- ]?may|similar|also[- ]?bought|carousel|thumbnail)/i;
+const EDITORIAL_CONTEXT = /(blog|magazine|editorial|lookbook|trends?|review|guide|how[- ]?to)/i;
+const REJECT_TITLE = /(logo|banner|icon|favicon|advert|coupon|deal[- ]?of[- ]?the[- ]?day)/i;
+
+interface ParsedQuery {
+  raw: string;
+  normalized: string;
+  tokens: string[];
+  brand: string | null;
+  brandTokens: string[];
+  gender: string | null;
+  categoryKey: string | null;
+  categoryWords: string[];
+  colors: string[];
+  lengths: string[];
+  silhouettes: string[];
+  quoted: string;
+}
+
+function parseQuery(q: string): ParsedQuery {
+  const normalized = normalizeQuery(q);
+  const lower = normalized.toLowerCase();
+  const tokens = lower.split(/[^a-z0-9&']+/i).filter(Boolean);
+
+  let categoryKey: string | null = null;
+  const categoryWords: string[] = [];
+  for (const [key, words] of Object.entries(CATEGORY_WORDS)) {
+    for (const w of words) {
+      if (lower.includes(w)) {
+        if (!categoryKey) categoryKey = key;
+        categoryWords.push(w);
+      }
+    }
   }
-  const normalized = normalizeQuery(query);
-  console.log("[product-search] query:", normalized);
+  const colors = COLOR_WORDS.filter((c) => new RegExp(`\\b${c}\\b`, "i").test(lower));
+  const lengths = LENGTH_WORDS.filter((l) => lower.includes(l));
+  const silhouettes = SILHOUETTE_WORDS.filter((s) => lower.includes(s));
+  const gender = GENDER_WORDS.find((g) => new RegExp(`\\b${g}\\b`, "i").test(lower)) ?? null;
 
-  const candidates: { url: string; source: string }[] = [];
+  // Brand heuristic: leading capitalized words (up to 3) before the first attribute keyword.
+  const originalTokens = normalized.split(/\s+/);
+  const attributeSet = new Set<string>([
+    ...GENDER_WORDS,
+    ...LENGTH_WORDS,
+    ...COLOR_WORDS,
+    ...Object.values(CATEGORY_WORDS).flat(),
+  ]);
+  const brandTokens: string[] = [];
+  for (const t of originalTokens) {
+    const low = t.toLowerCase().replace(/[^a-z0-9&']/g, "");
+    if (!low) continue;
+    if (attributeSet.has(low)) break;
+    // Only capitalized-first tokens count as brand (skip "the","by" etc.)
+    if (!/^[A-Z0-9&]/.test(t)) break;
+    brandTokens.push(t.replace(/[^A-Za-z0-9&']/g, ""));
+    if (brandTokens.length >= 3) break;
+  }
+  const brand = brandTokens.length ? brandTokens.join(" ") : null;
 
-  // Firecrawl v2 supports multi-source search: web + images. Image source returns
-  // direct image URLs from Google/Bing image search without needing to scrape
-  // retailer pages (which usually block scrapers or return login walls).
-  try {
-    const r = await fetch("https://api.firecrawl.dev/v2/search", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${firecrawlKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: normalized,
-        sources: ["images", "web"],
-        limit: 10,
-      }),
-    });
-    console.log("[product-search] firecrawl status:", r.status);
-    if (r.ok) {
+  return {
+    raw: q,
+    normalized,
+    tokens,
+    brand,
+    brandTokens: brandTokens.map((b) => b.toLowerCase()),
+    gender,
+    categoryKey,
+    categoryWords,
+    colors,
+    lengths,
+    silhouettes,
+    quoted: `"${normalized}"`,
+  };
+}
+
+function buildSearchVariants(p: ParsedQuery): string[] {
+  const v: string[] = [];
+  v.push(p.quoted);
+  v.push(p.normalized);
+  if (p.brand) {
+    const core = [
+      p.brand,
+      ...p.colors,
+      ...p.lengths,
+      ...p.silhouettes,
+      ...(p.categoryWords.slice(0, 1)),
+    ].filter(Boolean).join(" ");
+    if (core) v.push(core);
+    if (p.categoryWords[0]) v.push(`${p.brand} ${p.gender ?? ""} ${p.categoryWords[0]}`.replace(/\s+/g, " ").trim());
+  }
+  // De-dupe preserving order.
+  return Array.from(new Set(v)).slice(0, 4);
+}
+
+function scoreCandidate(p: ParsedQuery, cand: { title: string; snippet: string; imageUrl: string; sourceDomain: string }): { score: number; reasons: string[] } {
+  const t = `${cand.title} ${cand.snippet}`.toLowerCase();
+  const url = cand.imageUrl.toLowerCase();
+  const reasons: string[] = [];
+  let score = 0;
+
+  // Exact / near-exact title.
+  const normLower = p.normalized.toLowerCase();
+  if (t.includes(normLower)) { score += 40; reasons.push("exact-title"); }
+  else {
+    const matchedTokens = p.tokens.filter((tok) => tok.length > 2 && t.includes(tok)).length;
+    const pct = p.tokens.length ? matchedTokens / p.tokens.length : 0;
+    if (pct >= 0.7) { score += 25; reasons.push(`token-match-${Math.round(pct*100)}%`); }
+    else if (pct >= 0.4) { score += 10; reasons.push(`token-partial-${Math.round(pct*100)}%`); }
+  }
+
+  // Brand.
+  if (p.brand) {
+    const brandLow = p.brand.toLowerCase();
+    const brandHit = t.includes(brandLow) || cand.sourceDomain.includes(brandLow.replace(/\s+/g, ""));
+    if (brandHit) { score += 25; reasons.push("brand-match"); }
+    // Conflicting brand: another known-ish brand token appears prominently and ours doesn't.
+    if (!brandHit) {
+      // Look for a "by <brand>" or leading capitalized brand in title that isn't ours.
+      const foreign = /\b(zara|h&m|mango|nike|adidas|puma|shein|asos|uniqlo|forever\s?21|only|biba|w for woman|allen solly|tommy|calvin klein|gucci|prada|urbanic|vero moda)\b/i;
+      const m = t.match(foreign);
+      if (m && !brandLow.includes(m[0].toLowerCase())) { score -= 50; reasons.push(`wrong-brand-${m[0]}`); }
+    }
+  }
+
+  // Category.
+  if (p.categoryWords.length) {
+    const catHit = p.categoryWords.some((w) => t.includes(w));
+    if (catHit) { score += 15; reasons.push("category-match"); }
+    else {
+      // Conflicting category: text mentions a *different* category strongly.
+      const otherCats = Object.entries(CATEGORY_WORDS)
+        .filter(([k]) => k !== p.categoryKey)
+        .flatMap(([, ws]) => ws);
+      const conflict = otherCats.find((w) => new RegExp(`\\b${w}\\b`, "i").test(t));
+      if (conflict) { score -= 50; reasons.push(`wrong-category-${conflict}`); }
+    }
+  }
+
+  // Length / silhouette.
+  if (p.lengths.length && p.lengths.some((l) => t.includes(l))) { score += 10; reasons.push("length-match"); }
+  if (p.silhouettes.length && p.silhouettes.some((s) => t.includes(s))) { score += 10; reasons.push("silhouette-match"); }
+
+  // Gender.
+  if (p.gender && new RegExp(`\\b${p.gender}\\b`, "i").test(t)) { score += 5; reasons.push("gender-match"); }
+
+  // Color.
+  if (p.colors.length) {
+    if (p.colors.some((c) => new RegExp(`\\b${c}\\b`, "i").test(t))) { score += 10; reasons.push("color-match"); }
+    const otherColor = COLOR_WORDS.find((c) => !p.colors.includes(c) && new RegExp(`\\b${c}\\b`, "i").test(t));
+    if (otherColor) { score -= 20; reasons.push(`wrong-color-${otherColor}`); }
+    // Floral penalty when query implies solid (no "floral"/"print" tokens).
+    if (!/floral|print|pattern/.test(normLower) && /floral|print/.test(t)) { score -= 15; reasons.push("unwanted-print"); }
+  }
+
+  // Context penalties.
+  if (NEGATIVE_CONTEXT.test(cand.title) || NEGATIVE_CONTEXT.test(url)) { score -= 30; reasons.push("carousel-context"); }
+  if (EDITORIAL_CONTEXT.test(cand.title) || EDITORIAL_CONTEXT.test(cand.sourceDomain)) { score -= 20; reasons.push("editorial"); }
+  if (REJECT_TITLE.test(cand.title)) { score = -999; reasons.push("logo-or-banner"); }
+
+  return { score, reasons };
+}
+
+interface ScoredCandidate {
+  imageUrl: string;
+  title: string;
+  sourceDomain: string;
+  score: number;
+  reasons?: string[];
+}
+
+async function findProductCandidates(query: string, firecrawlKey: string): Promise<ScoredCandidate[]> {
+  const parsed = parseQuery(query);
+  const variants = buildSearchVariants(parsed);
+  console.log("[product-search] parsed:", JSON.stringify({
+    brand: parsed.brand, categoryKey: parsed.categoryKey,
+    colors: parsed.colors, lengths: parsed.lengths, silhouettes: parsed.silhouettes,
+  }));
+  console.log("[product-search] variants:", variants);
+
+  type Raw = { imageUrl: string; title: string; snippet: string; sourceDomain: string; source: string };
+  const seen = new Set<string>();
+  const raws: Raw[] = [];
+
+  for (const q of variants) {
+    try {
+      const r = await fetch("https://api.firecrawl.dev/v2/search", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${firecrawlKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, sources: ["images", "web"], limit: 8 }),
+      });
+      if (!r.ok) { console.error("[product-search] variant failed", q, r.status); continue; }
       const d = await r.json();
       const payload = d?.data ?? d;
       const imgs: any[] = Array.isArray(payload?.images) ? payload.images : [];
       const webs: any[] = Array.isArray(payload?.web) ? payload.web : Array.isArray(payload?.data) ? payload.data : [];
-      console.log("[product-search] candidates: images=", imgs.length, "web=", webs.length);
 
       for (const it of imgs) {
         const u = it?.imageUrl || it?.url || it?.src;
-        if (typeof u === "string") candidates.push({ url: u, source: "image-search" });
+        if (typeof u !== "string" || seen.has(u)) continue;
+        seen.add(u);
+        raws.push({
+          imageUrl: u,
+          title: String(it?.title ?? it?.alt ?? ""),
+          snippet: String(it?.description ?? it?.snippet ?? it?.position ?? ""),
+          sourceDomain: safeHost(it?.url ?? u),
+          source: "image-search",
+        });
       }
       for (const row of webs) {
         const meta = row?.metadata ?? {};
         const u = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
-        if (typeof u === "string") {
-          try { candidates.push({ url: new URL(u, row?.url).toString(), source: "web-og" }); }
-          catch { candidates.push({ url: u, source: "web-og" }); }
-        }
+        if (typeof u !== "string") continue;
+        let abs = u;
+        try { abs = new URL(u, row?.url).toString(); } catch { /* keep */ }
+        if (seen.has(abs)) continue;
+        seen.add(abs);
+        raws.push({
+          imageUrl: abs,
+          title: String(row?.title ?? meta.title ?? ""),
+          snippet: String(row?.description ?? meta.description ?? ""),
+          sourceDomain: safeHost(row?.url ?? abs),
+          source: "web-og",
+        });
       }
-    } else {
-      console.error("[product-search] firecrawl error body:", (await r.text()).slice(0, 400));
-    }
-  } catch (e) {
-    console.error("[product-search] firecrawl threw:", (e as Error).message);
-  }
-
-  console.log("[product-search] total candidates:", candidates.length);
-
-  for (const c of candidates) {
-    const v = await validateImageCandidate(c.url);
-    if (v.ok) {
-      console.log("[product-search] selected:", v.host, "via", c.source);
-      return c.url;
-    } else {
-      console.log("[product-search] rejected", v.host ?? "?", "→", v.reason);
+    } catch (e) {
+      console.error("[product-search] variant threw", q, (e as Error).message);
     }
   }
 
-  console.log("[product-search] no valid candidate found");
-  return undefined;
+  console.log("[product-search] raw candidates:", raws.length);
+
+  // Score first, then validate only the top-N URLs (avoids wasted HEAD calls).
+  const scored = raws
+    .map((r) => ({ raw: r, ...scoreCandidate(parsed, r) }))
+    .sort((a, b) => b.score - a.score);
+
+  console.log("[product-search] top 5 scores:",
+    scored.slice(0, 5).map((s) => ({ score: s.score, host: s.raw.sourceDomain, title: s.raw.title.slice(0, 60), reasons: s.reasons })));
+
+  const results: ScoredCandidate[] = [];
+  for (const s of scored) {
+    if (s.score < 0) continue;
+    if (results.length >= 6) break;
+    const v = await validateImageCandidate(s.raw.imageUrl);
+    if (!v.ok) { console.log("[product-search] validate reject", v.host, v.reason); continue; }
+    results.push({
+      imageUrl: s.raw.imageUrl,
+      title: s.raw.title || s.raw.sourceDomain,
+      sourceDomain: s.raw.sourceDomain,
+      score: s.score,
+      reasons: s.reasons,
+    });
+  }
+  console.log("[product-search] final scored candidates:", results.length,
+    results.map((r) => ({ score: r.score, host: r.sourceDomain })));
+  return results;
+}
+
+function safeHost(u?: string): string {
+  if (!u) return "";
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; }
+}
+
+async function scrapeProductPageImage(url: string, firecrawlKey?: string): Promise<string | undefined> {
+  let img: string | undefined;
+  if (firecrawlKey) {
+    try {
+      const fc = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${firecrawlKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url, formats: ["markdown", "html"], onlyMainContent: false, waitFor: 1500 }),
+      });
+      if (fc.ok) {
+        const d = await fc.json();
+        const meta = d?.data?.metadata ?? d?.metadata ?? {};
+        img = meta.ogImage || meta["og:image"] || meta.twitterImage || meta["twitter:image"] || meta.image;
+        const html: string = d?.data?.html ?? d?.html ?? "";
+        if (!img && html) img = extractImageFromHtml(html);
+      }
+    } catch { /* ignore */ }
+  }
+  if (!img) {
+    try {
+      const html = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      }).then((r) => (r.ok ? r.text() : "")).catch(() => "");
+      if (html) img = extractImageFromHtml(html);
+    } catch { /* ignore */ }
+  }
+  if (img) {
+    try { img = new URL(img, url).toString(); } catch { /* keep */ }
+    const v = await validateImageCandidate(img);
+    if (!v.ok) return undefined;
+  }
+  return img;
 }
