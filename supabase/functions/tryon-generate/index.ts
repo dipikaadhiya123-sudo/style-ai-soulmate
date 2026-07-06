@@ -70,15 +70,75 @@ Deno.serve(async (req) => {
 
     const body = (await req.json().catch(() => ({}))) ?? {};
     const photoPath: string | undefined = body.photoPath;
+    const resolveOnly: boolean = !!body.resolveOnly;
     // Backward compatible: accept single itemImageUrl or array of items
     const items: { imageUrl?: string; productUrl?: string; label?: string; category?: Category }[] =
       Array.isArray(body.items) && body.items.length > 0
         ? body.items
         : [{ imageUrl: body.itemImageUrl, productUrl: body.productUrl, label: body.itemLabel, category: body.category }];
 
-    if (!photoPath) return json({ error: "Missing photoPath" }, 400);
     if (!items.some((i) => i.imageUrl || i.productUrl || i.label)) {
       return json({ error: "Provide at least one item image, link, or description" }, 400);
+    }
+    if (!resolveOnly && !photoPath) return json({ error: "Missing photoPath" }, 400);
+
+    // -------- resolveOnly: search + score candidates without generating --------
+    if (resolveOnly) {
+      const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+      const it = items[0];
+      // Direct image → nothing to search, just echo back.
+      if (it.productUrl && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(it.productUrl)) {
+        return json({
+          success: true,
+          confidence: "high",
+          best: { imageUrl: it.productUrl, title: it.label ?? it.productUrl, sourceDomain: safeHost(it.productUrl), score: 100 },
+          candidates: [{ imageUrl: it.productUrl, title: it.label ?? it.productUrl, sourceDomain: safeHost(it.productUrl), score: 100 }],
+        });
+      }
+      // Product page URL → scrape main image only.
+      if (it.productUrl) {
+        const img = await scrapeProductPageImage(it.productUrl, FIRECRAWL_API_KEY);
+        if (!img) {
+          return json({
+            success: false,
+            code: "PRODUCT_IMAGE_NOT_FOUND",
+            error: "Couldn't extract a product image from that page. Try a different link or upload the garment image.",
+          }, 200);
+        }
+        return json({
+          success: true,
+          confidence: "high",
+          best: { imageUrl: img, title: it.label ?? it.productUrl, sourceDomain: safeHost(it.productUrl), score: 90 },
+          candidates: [{ imageUrl: img, title: it.label ?? it.productUrl, sourceDomain: safeHost(it.productUrl), score: 90 }],
+        });
+      }
+      // Product name → multi-query search + scoring.
+      const q = (it.label ?? "").trim();
+      if (!q) return json({ success: false, code: "PRODUCT_QUERY_EMPTY", error: "Enter a product name." }, 200);
+      if (!FIRECRAWL_API_KEY) {
+        return json({
+          success: false,
+          code: "PRODUCT_SEARCH_NOT_CONFIGURED",
+          error: "Product-name search needs a search provider. Paste the product page link or upload the garment image.",
+        }, 200);
+      }
+      const scored = await findProductCandidates(q, FIRECRAWL_API_KEY);
+      const MIN_CONFIDENCE = 45;
+      const top = scored.slice(0, 6);
+      if (!top.length || top[0].score < MIN_CONFIDENCE) {
+        return json({
+          success: false,
+          code: "LOW_PRODUCT_MATCH_CONFIDENCE",
+          error: "We found similar products but could not confidently identify the exact item. Please paste the product page link or upload the garment image.",
+          candidates: top,
+        }, 200);
+      }
+      return json({
+        success: true,
+        confidence: top[0].score >= 70 ? "high" : "medium",
+        best: top[0],
+        candidates: top,
+      });
     }
 
     // Resolve pasted product links (Myntra/Ajio/Amazon/Pinterest/Instagram) or
