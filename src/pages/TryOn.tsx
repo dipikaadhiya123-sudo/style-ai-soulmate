@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2, AlertCircle, History, Trash2, Store } from "lucide-react";
+import { Camera, ImageIcon, Sparkles, X, Upload, Loader2, Save, Share2, Download, Link2, AlertCircle, History, Trash2, Store, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +12,8 @@ import BeforeAfter from "@/components/BeforeAfter";
 import AvailabilityPanel from "@/components/AvailabilityPanel";
 import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
 import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
+
+type ProductCandidate = { imageUrl: string; title: string; sourceDomain: string; score: number };
 
 export default function TryOn() {
   const { user } = useAuth();
@@ -28,12 +31,19 @@ export default function TryOn() {
   const [urlStatus, setUrlStatus] = useState<"idle" | "checking" | "reachable" | "error">("idle");
 
   const [generating, setGenerating] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultPath, setResultPath] = useState<string | null>(null);
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
+
+  // Product-match confirmation
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [candidates, setCandidates] = useState<ProductCandidate[]>([]);
+  const [selectedCandidateIdx, setSelectedCandidateIdx] = useState(0);
+  const [pendingLabel, setPendingLabel] = useState<string>("");
 
   const extractHttpUrl = useCallback((value: string) => {
     const match = value.match(/https?:\/\/[^\s<>'"]+/i);
@@ -159,7 +169,25 @@ export default function TryOn() {
     resetResult();
   };
 
-  const generate = async () => {
+  const parseFunctionError = async (error: unknown): Promise<{ message: string; status?: number; body?: any }> => {
+    let backendMsg: string | undefined;
+    let backendStatus: number | undefined;
+    let body: any = null;
+    try {
+      const res: Response | undefined = (error as { context?: Response }).context;
+      if (res && typeof res.json === "function") {
+        backendStatus = res.status;
+        body = await res.clone().json().catch(() => null);
+        backendMsg = body?.error || body?.message;
+      }
+    } catch { /* ignore */ }
+    const fallback = (error as { message?: string })?.message ?? "Request failed";
+    return { message: backendMsg ? `${backendMsg}${backendStatus ? ` (HTTP ${backendStatus})` : ""}` : fallback, status: backendStatus, body };
+  };
+
+  // For product-name / product-URL flows, resolve candidates first and let the
+  // user confirm the correct garment before spending an AI generation credit.
+  const startGenerate = async () => {
     if (!user) return toast.error("Please sign in.");
     if (!photoFile) return toast.error("Add your photo.");
     const productInput = productUrl.trim();
@@ -168,15 +196,62 @@ export default function TryOn() {
     const hasProductInput = !!productInput && !inputError;
     if (!itemDataUrl && !hasProductInput) return toast.error("Add the product photo, paste a link, or type the product name.");
 
-    if (productInput && !itemDataUrl) {
-      if (inputError) {
-        setUrlError(inputError);
-        setUrlStatus("error");
-        return toast.error(inputError);
-      }
-      setUrlError(null);
+    // Direct upload → no ambiguity, generate straight away.
+    if (itemDataUrl) {
+      return runGeneration({ imageUrl: itemDataUrl, label: undefined });
     }
 
+    // Product URL or product name → resolve candidates first.
+    setResolving(true);
+    setPendingLabel(productInput);
+    try {
+      const item: Record<string, string> = {};
+      if (url) {
+        item.productUrl = url;
+        const pastedLabel = productInput.replace(url, "").trim();
+        if (pastedLabel) item.label = pastedLabel;
+      } else {
+        item.label = productInput;
+      }
+      const { data, error } = await supabase.functions.invoke("tryon-generate", {
+        body: { resolveOnly: true, items: [item] },
+      });
+      if (error) {
+        const parsed = await parseFunctionError(error);
+        // LOW_PRODUCT_MATCH_CONFIDENCE arrives with candidates — still show them.
+        if (parsed.body?.candidates?.length) {
+          setCandidates(parsed.body.candidates);
+          setSelectedCandidateIdx(0);
+          setConfirmOpen(true);
+          toast.warning("We're not 100% sure — pick the closest match or paste the product link.");
+          return;
+        }
+        throw new Error(parsed.message);
+      }
+      if (data?.success === false) {
+        if (data.candidates?.length) {
+          setCandidates(data.candidates);
+          setSelectedCandidateIdx(0);
+          setConfirmOpen(true);
+          toast.warning(data.error ?? "Pick the closest match or paste the product link.");
+          return;
+        }
+        throw new Error(data.error ?? "Couldn't find that product.");
+      }
+      const list: ProductCandidate[] = data?.candidates ?? (data?.best ? [data.best] : []);
+      if (!list.length) throw new Error("No product image found.");
+      setCandidates(list);
+      setSelectedCandidateIdx(0);
+      setConfirmOpen(true);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't resolve that product");
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const runGeneration = async (chosen: { imageUrl: string; label?: string }) => {
+    if (!user || !photoFile) return;
     setGenerating(true);
     resetResult();
     try {
@@ -188,33 +263,15 @@ export default function TryOn() {
       if (upErr) throw upErr;
       setPhotoPath(path);
 
-      const item: Record<string, string> = {};
-      if (itemDataUrl) item.imageUrl = itemDataUrl;
-      else if (url) {
-        item.productUrl = url;
-        const pastedLabel = productInput.replace(url, "").trim();
-        if (pastedLabel) item.label = pastedLabel;
-      } else if (productInput) {
-        item.label = productInput;
-      }
+      const item: Record<string, string> = { imageUrl: chosen.imageUrl };
+      if (chosen.label) item.label = chosen.label;
 
       const { data, error } = await supabase.functions.invoke("tryon-generate", {
         body: { photoPath: path, items: [item] },
       });
       if (error) {
-        // supabase-js swallows the response body into error.context (a Response).
-        // Parse it so we can show the real backend reason instead of "non-2xx status code".
-        let backendMsg: string | undefined;
-        let backendStatus: number | undefined;
-        try {
-          const res: Response | undefined = (error as { context?: Response }).context;
-          if (res && typeof res.json === "function") {
-            backendStatus = res.status;
-            const body = await res.clone().json().catch(() => null);
-            backendMsg = body?.error || body?.message;
-          }
-        } catch { /* ignore */ }
-        throw new Error(backendMsg ? `${backendMsg}${backendStatus ? ` (HTTP ${backendStatus})` : ""}` : (error.message || "Try-on request failed"));
+        const parsed = await parseFunctionError(error);
+        throw new Error(parsed.message);
       }
       if (data?.error) throw new Error(data.error);
 
@@ -223,13 +280,14 @@ export default function TryOn() {
       const det = data?.detected?.[0];
       if (det) setDetected(det);
 
-      // Persist to local history so users can reopen this Before/After later.
       try {
         const beforeDataUrl = await fileToDataUrl(photoFile);
+        const productInput = productUrl.trim();
+        const url = extractHttpUrl(productInput);
         addHistory({
           beforeUrl: beforeDataUrl,
           afterUrl: data.resultUrl,
-          label: det?.label ?? (productInput && !url ? productInput : "Try-on look"),
+          label: det?.label ?? chosen.label ?? (productInput && !url ? productInput : "Try-on look"),
           category: det?.category,
           sourceUrl: url ?? undefined,
         });
@@ -245,6 +303,16 @@ export default function TryOn() {
       setGenerating(false);
     }
   };
+
+  const confirmAndGenerate = () => {
+    const c = candidates[selectedCandidateIdx];
+    if (!c) return;
+    setConfirmOpen(false);
+    runGeneration({ imageUrl: c.imageUrl, label: pendingLabel || c.title });
+  };
+
+  // Kept as an alias so existing button handlers work.
+  const generate = startGenerate;
 
   const save = async (opts?: { silent?: boolean }): Promise<string | null> => {
     if (!user || !resultPath || !photoPath) return null;
@@ -450,14 +518,16 @@ export default function TryOn() {
           <Button
             type="button"
             onClick={generate}
-            disabled={!canGenerateFromLink}
+            disabled={!canGenerateFromLink || resolving}
             className="mt-4 w-full h-12 bg-gradient-accent text-accent-foreground border-0"
           >
-            {generating
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
-              : !photoFile
-                ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
-                : <><Sparkles className="w-4 h-4" /> Generate try-on</>}
+            {resolving
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Finding the product…</>
+              : generating
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
+                : !photoFile
+                  ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
+                  : <><Sparkles className="w-4 h-4" /> Find product & try on</>}
           </Button>
         )}
       </div>
@@ -604,6 +674,77 @@ export default function TryOn() {
           </p>
         </section>
       )}
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Is this the correct product?</DialogTitle>
+            <DialogDescription>
+              We found the closest matches for “{pendingLabel}”. Pick the right one before we spend a try-on credit.
+            </DialogDescription>
+          </DialogHeader>
+
+          {candidates[selectedCandidateIdx] && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <img
+                src={candidates[selectedCandidateIdx].imageUrl}
+                alt={candidates[selectedCandidateIdx].title}
+                referrerPolicy="no-referrer"
+                className="w-full aspect-square object-contain bg-muted"
+              />
+              <div className="p-3 text-xs">
+                <div className="font-medium line-clamp-2">{candidates[selectedCandidateIdx].title}</div>
+                <div className="text-muted-foreground mt-0.5">
+                  {candidates[selectedCandidateIdx].sourceDomain} · match {candidates[selectedCandidateIdx].score}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {candidates.length > 1 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-2">Other matches</div>
+              <div className="grid grid-cols-4 gap-2">
+                {candidates.map((c, i) => (
+                  <button
+                    key={c.imageUrl}
+                    type="button"
+                    onClick={() => setSelectedCandidateIdx(i)}
+                    className={cn(
+                      "relative rounded-lg overflow-hidden border aspect-square bg-muted",
+                      i === selectedCandidateIdx ? "border-accent ring-2 ring-accent/40" : "border-border"
+                    )}
+                    title={`${c.title} · ${c.sourceDomain} · ${c.score}`}
+                  >
+                    <img src={c.imageUrl} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    {i === selectedCandidateIdx && (
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-accent text-accent-foreground flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setConfirmOpen(false); itemInput.current?.click(); }}
+            >
+              <Upload className="w-4 h-4" /> Upload garment instead
+            </Button>
+            <Button
+              onClick={confirmAndGenerate}
+              disabled={!candidates.length}
+              className="bg-gradient-accent text-accent-foreground border-0"
+            >
+              <Sparkles className="w-4 h-4" /> Yes, try it on
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
