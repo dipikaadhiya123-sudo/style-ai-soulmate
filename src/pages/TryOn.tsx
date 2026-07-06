@@ -31,12 +31,19 @@ export default function TryOn() {
   const [urlStatus, setUrlStatus] = useState<"idle" | "checking" | "reachable" | "error">("idle");
 
   const [generating, setGenerating] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultPath, setResultPath] = useState<string | null>(null);
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
+
+  // Product-match confirmation
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [candidates, setCandidates] = useState<ProductCandidate[]>([]);
+  const [selectedCandidateIdx, setSelectedCandidateIdx] = useState(0);
+  const [pendingLabel, setPendingLabel] = useState<string>("");
 
   const extractHttpUrl = useCallback((value: string) => {
     const match = value.match(/https?:\/\/[^\s<>'"]+/i);
