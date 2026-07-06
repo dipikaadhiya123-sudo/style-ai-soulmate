@@ -518,14 +518,16 @@ export default function TryOn() {
           <Button
             type="button"
             onClick={generate}
-            disabled={!canGenerateFromLink}
+            disabled={!canGenerateFromLink || resolving}
             className="mt-4 w-full h-12 bg-gradient-accent text-accent-foreground border-0"
           >
-            {generating
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
-              : !photoFile
-                ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
-                : <><Sparkles className="w-4 h-4" /> Generate try-on</>}
+            {resolving
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Finding the product…</>
+              : generating
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating your try-on…</>
+                : !photoFile
+                  ? <><Sparkles className="w-4 h-4" /> Add your photo to generate</>
+                  : <><Sparkles className="w-4 h-4" /> Find product & try on</>}
           </Button>
         )}
       </div>
