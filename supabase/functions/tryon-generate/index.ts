@@ -204,14 +204,17 @@ Deno.serve(async (req) => {
               error: "Product-name search needs a search provider. Paste the product page link or upload the garment image.",
             }, 400);
           }
-          img = await findProductImage(query, FIRECRAWL_API_KEY);
-          if (!img) {
+          const scored = await findProductCandidates(query, FIRECRAWL_API_KEY);
+          const MIN_CONFIDENCE = 45;
+          if (!scored.length || scored[0].score < MIN_CONFIDENCE) {
             return json({
               success: false,
-              code: "PRODUCT_IMAGE_NOT_FOUND",
-              error: "No usable product image was found. Try the exact product page link or upload the garment image.",
-            }, 404);
+              code: "LOW_PRODUCT_MATCH_CONFIDENCE",
+              error: "We found similar products but could not confidently identify the exact item. Please paste the product page link or upload the garment image.",
+              candidates: scored.slice(0, 6),
+            }, 200);
           }
+          img = scored[0].imageUrl;
         }
 
         if (img) it.imageUrl = img;
