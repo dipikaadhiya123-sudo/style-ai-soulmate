@@ -674,6 +674,77 @@ export default function TryOn() {
           </p>
         </section>
       )}
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Is this the correct product?</DialogTitle>
+            <DialogDescription>
+              We found the closest matches for “{pendingLabel}”. Pick the right one before we spend a try-on credit.
+            </DialogDescription>
+          </DialogHeader>
+
+          {candidates[selectedCandidateIdx] && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <img
+                src={candidates[selectedCandidateIdx].imageUrl}
+                alt={candidates[selectedCandidateIdx].title}
+                referrerPolicy="no-referrer"
+                className="w-full aspect-square object-contain bg-muted"
+              />
+              <div className="p-3 text-xs">
+                <div className="font-medium line-clamp-2">{candidates[selectedCandidateIdx].title}</div>
+                <div className="text-muted-foreground mt-0.5">
+                  {candidates[selectedCandidateIdx].sourceDomain} · match {candidates[selectedCandidateIdx].score}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {candidates.length > 1 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-2">Other matches</div>
+              <div className="grid grid-cols-4 gap-2">
+                {candidates.map((c, i) => (
+                  <button
+                    key={c.imageUrl}
+                    type="button"
+                    onClick={() => setSelectedCandidateIdx(i)}
+                    className={cn(
+                      "relative rounded-lg overflow-hidden border aspect-square bg-muted",
+                      i === selectedCandidateIdx ? "border-accent ring-2 ring-accent/40" : "border-border"
+                    )}
+                    title={`${c.title} · ${c.sourceDomain} · ${c.score}`}
+                  >
+                    <img src={c.imageUrl} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    {i === selectedCandidateIdx && (
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-accent text-accent-foreground flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setConfirmOpen(false); itemInput.current?.click(); }}
+            >
+              <Upload className="w-4 h-4" /> Upload garment instead
+            </Button>
+            <Button
+              onClick={confirmAndGenerate}
+              disabled={!candidates.length}
+              className="bg-gradient-accent text-accent-foreground border-0"
+            >
+              <Sparkles className="w-4 h-4" /> Yes, try it on
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
