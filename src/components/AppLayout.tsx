@@ -27,6 +27,7 @@ const mobileNavItems = [
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 
+export default function AppLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { theme, toggle } = useTheme();
