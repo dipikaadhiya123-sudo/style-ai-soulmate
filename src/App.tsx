@@ -1,43 +1,56 @@
+import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTheme } from "@/hooks/useTheme";
+import { Loader2 } from "lucide-react";
+import AppLayout from "@/components/AppLayout";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
-import Onboarding from "./pages/Onboarding";
-import Studio from "./pages/Studio";
-import Stylist from "./pages/Stylist";
-import TryOn from "./pages/TryOn";
-import Lookbook from "./pages/Lookbook";
-import MyLooks from "./pages/MyLooks";
-import Chat from "./pages/Chat";
-import Profile from "./pages/Profile";
-import SharedOutfit from "./pages/SharedOutfit";
-import SharedLook from "./pages/SharedLook";
-import Wishlist from "./pages/Wishlist";
 import NotFound from "./pages/NotFound";
-import AppLayout from "./components/AppLayout";
-import SubscriptionPage from "./pages/subscription/SubscriptionPage";
-import PaymentHistory from "./pages/PaymentHistory";
-import AdminRevenue from "./pages/AdminRevenue";
-import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
-import TermsOfService from "./pages/legal/TermsOfService";
-import RefundPolicy from "./pages/legal/RefundPolicy";
-import CookiePolicy from "./pages/legal/CookiePolicy";
-import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
-import ContentModerationPolicy from "./pages/legal/ContentModerationPolicy";
-import CopyrightPolicy from "./pages/legal/CopyrightPolicy";
-import ContactUs from "./pages/legal/ContactUs";
-import AboutUs from "./pages/legal/AboutUs";
+
+// Eager: Landing, Auth, AuthCallback, NotFound — critical first-paint routes.
+// Lazy: everything else — only loaded when the user navigates to them.
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Stylist = lazy(() => import("./pages/Stylist"));
+const TryOn = lazy(() => import("./pages/TryOn"));
+const Lookbook = lazy(() => import("./pages/Lookbook"));
+const MyLooks = lazy(() => import("./pages/MyLooks"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Profile = lazy(() => import("./pages/Profile"));
+const SharedOutfit = lazy(() => import("./pages/SharedOutfit"));
+const SharedLook = lazy(() => import("./pages/SharedLook"));
+const Wishlist = lazy(() => import("./pages/Wishlist"));
+const SubscriptionPage = lazy(() => import("./pages/subscription/SubscriptionPage"));
+const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+const AdminRevenue = lazy(() => import("./pages/AdminRevenue"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+const RefundPolicy = lazy(() => import("./pages/legal/RefundPolicy"));
+const CookiePolicy = lazy(() => import("./pages/legal/CookiePolicy"));
+const CommunityGuidelines = lazy(() => import("./pages/legal/CommunityGuidelines"));
+const ContentModerationPolicy = lazy(() => import("./pages/legal/ContentModerationPolicy"));
+const CopyrightPolicy = lazy(() => import("./pages/legal/CopyrightPolicy"));
+const ContactUs = lazy(() => import("./pages/legal/ContactUs"));
+const AboutUs = lazy(() => import("./pages/legal/AboutUs"));
 
 const queryClient = new QueryClient();
 
 function ThemeBoot() {
   useTheme();
   return null;
+}
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-accent" />
+    </div>
+  );
 }
 
 const App = () => (
@@ -51,30 +64,30 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/outfit/:slug" element={<SharedOutfit />} />
-          <Route path="/look/:slug" element={<SharedLook />} />
-          <Route path="/subscription" element={<SubscriptionPage />} />
-          <Route path="/payment-history" element={<PaymentHistory />} />
-          <Route path="/admin/revenue" element={<AdminRevenue />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/refunds" element={<RefundPolicy />} />
-          <Route path="/cookies" element={<CookiePolicy />} />
-          <Route path="/guidelines" element={<CommunityGuidelines />} />
-          <Route path="/moderation" element={<ContentModerationPolicy />} />
-          <Route path="/copyright" element={<CopyrightPolicy />} />
-          <Route path="/contact" element={<ContactUs />} />
-          <Route path="/about" element={<AboutUs />} />
+          <Route path="/outfit/:slug" element={<Suspense fallback={<PageFallback />}><SharedOutfit /></Suspense>} />
+          <Route path="/look/:slug" element={<Suspense fallback={<PageFallback />}><SharedLook /></Suspense>} />
+          <Route path="/subscription" element={<Suspense fallback={<PageFallback />}><SubscriptionPage /></Suspense>} />
+          <Route path="/payment-history" element={<Suspense fallback={<PageFallback />}><PaymentHistory /></Suspense>} />
+          <Route path="/admin/revenue" element={<Suspense fallback={<PageFallback />}><AdminRevenue /></Suspense>} />
+          <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPolicy /></Suspense>} />
+          <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsOfService /></Suspense>} />
+          <Route path="/refunds" element={<Suspense fallback={<PageFallback />}><RefundPolicy /></Suspense>} />
+          <Route path="/cookies" element={<Suspense fallback={<PageFallback />}><CookiePolicy /></Suspense>} />
+          <Route path="/guidelines" element={<Suspense fallback={<PageFallback />}><CommunityGuidelines /></Suspense>} />
+          <Route path="/moderation" element={<Suspense fallback={<PageFallback />}><ContentModerationPolicy /></Suspense>} />
+          <Route path="/copyright" element={<Suspense fallback={<PageFallback />}><CopyrightPolicy /></Suspense>} />
+          <Route path="/contact" element={<Suspense fallback={<PageFallback />}><ContactUs /></Suspense>} />
+          <Route path="/about" element={<Suspense fallback={<PageFallback />}><AboutUs /></Suspense>} />
           <Route element={<AppLayout />}>
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/studio" element={<Studio />} />
-            <Route path="/stylist" element={<Stylist />} />
-            <Route path="/tryon" element={<TryOn />} />
-            <Route path="/lookbook" element={<Lookbook />} />
-            <Route path="/looks" element={<MyLooks />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/onboarding" element={<Suspense fallback={<PageFallback />}><Onboarding /></Suspense>} />
+            <Route path="/studio" element={<Suspense fallback={<PageFallback />}><Studio /></Suspense>} />
+            <Route path="/stylist" element={<Suspense fallback={<PageFallback />}><Stylist /></Suspense>} />
+            <Route path="/tryon" element={<Suspense fallback={<PageFallback />}><TryOn /></Suspense>} />
+            <Route path="/lookbook" element={<Suspense fallback={<PageFallback />}><Lookbook /></Suspense>} />
+            <Route path="/looks" element={<Suspense fallback={<PageFallback />}><MyLooks /></Suspense>} />
+            <Route path="/chat" element={<Suspense fallback={<PageFallback />}><Chat /></Suspense>} />
+            <Route path="/wishlist" element={<Suspense fallback={<PageFallback />}><Wishlist /></Suspense>} />
+            <Route path="/profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
