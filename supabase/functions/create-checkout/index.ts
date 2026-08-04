@@ -1,7 +1,7 @@
 // Create Checkout - Stripe or Razorpay checkout session
 const corsHeaders = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 
-deno.serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const {createClient} = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
@@ -39,14 +39,17 @@ deno.serve(async (req) => {
     if (provider === "razorpay") {
       const id = Deno.env.get("RAZORPAY_KEY_ID")!;
       const secret = Deno.env.get("RAZORPAY_KEY_SECRET")!;
-      const amount = currency === "inr" ? billing === "yearly" ? plan.price_yearly_inr : plan.price_monthly_inr : billing === "yearly" ? plan.price_yearly_usd : plan.price_monthly_usd;
+      const amount = currency === "inr" 
+        ? (billingPeriod === "yearly" ? plan.price_yearly_inr : plan.price_monthly_inr)
+        : (billingPeriod === "yearly" ? plan.price_yearly_usd : plan.price_monthly_usd);
       const auth = btoa(`${id}:${secret}`);
       const orderResp = await fetch("https://api.razorpay.com/v1/orders", {
         method: "POST",
         headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount, currency: currency === "inr" ? "INR" : "USD",
-          receipt: `rcpt_${user.id.slice(0,8)},
+          amount,
+          currency: currency === "inr" ? "INR" : "USD",
+          receipt: `rcpt_${user.id.slice(0, 8)}`,
           notes: { user_id: user.id, plan_id: planId, billing_period: billingPeriod },
         }),
       });
@@ -54,7 +57,11 @@ deno.serve(async (req) => {
       return json({ provider: "razorpay", orderId: order.id, amount: order.amount, currency: order.currency, keyId: id });
     }
     return json({ error: "Invalid provider" }, 400);
-  } catch (e) { return json({ error: e.message }, 500); }
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+  }
 });
 
-function json(b, s=200) { return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+function json(b: any, s = 200) {
+  return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}

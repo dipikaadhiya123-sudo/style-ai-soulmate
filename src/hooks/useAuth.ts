@@ -17,14 +17,13 @@ async function ensureUserProfile(user: User) {
       user.email?.split("@")[0] ??
       "User";
 
-    const avatarUrl = metadata.avatar_url ?? metadata.picture ?? null;
-
+    // Only update columns that exist in the profiles table.
+    // The handle_new_user trigger creates the row on signup; this fills in
+    // the display name from OAuth metadata if the trigger used a fallback.
     const { error } = await (supabase as any).from("profiles").upsert(
       {
         id: user.id,
         display_name: fullName,
-        email: user.email,
-        avatar_url: avatarUrl,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id", ignoreDuplicates: false }

@@ -405,7 +405,7 @@ export default function TryOn() {
           Try it on in one tap
         </h1>
         <p className="text-muted-foreground mb-8 max-w-xl">
-          Upload your photo and the product photo. We'll do the rest.
+          Upload your photo, then add a product photo, paste a link, or type a product name. We'll do the rest.
         </p>
       </motion.div>
 
@@ -554,9 +554,42 @@ export default function TryOn() {
         </div>
       )}
 
+      {/* Progress indicator during generation */}
+      {(generating || resolving) && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 rounded-2xl border border-border bg-gradient-card p-5 shadow-soft"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <Loader2 className="w-5 h-5 animate-spin text-accent" />
+            <span className="text-sm font-medium">
+              {resolving ? "Finding the right product…" : "Rendering your try-on…"}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-gradient-accent"
+              initial={{ width: "10%" }}
+              animate={{ width: ["10%", "45%", "70%", "90%"] }}
+              transition={{
+                duration: 8,
+                times: [0, 0.3, 0.7, 1],
+                repeat: Infinity,
+                repeatType: "loop",
+                ease: "easeInOut",
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            This usually takes 10–20 seconds. Please don't close the page.
+          </p>
+        </motion.div>
+      )}
+
       {/* Single unified generate action — shows whenever a garment upload is present
           (the paste card has its own button for the URL/name flow). */}
-      {itemDataUrl && (
+      {itemDataUrl && !generating && !resolving && (
         <Button
           onClick={generate}
           disabled={!canGenerate}

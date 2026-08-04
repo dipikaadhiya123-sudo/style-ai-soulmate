@@ -1,7 +1,8 @@
 import { Outlet, Link, Navigate, useLocation } from "react-router-dom";
-import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart } from "lucide-react";
+import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart, Shirt } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { useOnboardingGuard } from "@/hooks/useOnboardingGuard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import NotificationsBell from "@/components/NotificationsBell";
@@ -10,9 +11,19 @@ const navItems = [
   { to: "/stylist", label: "Stylist", icon: Sparkles },
   { to: "/tryon", label: "Try-On", icon: Wand2 },
   { to: "/studio", label: "Studio", icon: Camera },
+  { to: "/looks", label: "Looks", icon: Shirt },
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/lookbook", label: "Lookbook", icon: BookHeart },
   { to: "/wishlist", label: "Alerts", icon: Heart },
+  { to: "/profile", label: "Profile", icon: UserIcon },
+];
+
+// Mobile bottom nav: only 5 key items for a clean, touchable layout
+const mobileNavItems = [
+  { to: "/stylist", label: "Style", icon: Sparkles },
+  { to: "/tryon", label: "Try-On", icon: Wand2 },
+  { to: "/looks", label: "Looks", icon: Shirt },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 
@@ -20,6 +31,7 @@ export default function AppLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { theme, toggle } = useTheme();
+  useOnboardingGuard();
 
   if (loading) {
     return (
@@ -71,10 +83,10 @@ export default function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — show 5 key items */}
       <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-background/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-7">
-          {navItems.map(item => {
+        <div className="grid grid-cols-5">
+          {mobileNavItems.map(item => {
             const Icon = item.icon;
             const active = location.pathname.startsWith(item.to);
             return (
