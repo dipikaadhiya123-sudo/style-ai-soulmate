@@ -1,7 +1,8 @@
 import { Outlet, Link, Navigate, useLocation } from "react-router-dom";
-import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart } from "lucide-react";
+import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart, Shirt } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { useOnboardingGuard } from "@/hooks/useOnboardingGuard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import NotificationsBell from "@/components/NotificationsBell";
