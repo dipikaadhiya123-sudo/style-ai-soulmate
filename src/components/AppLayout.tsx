@@ -74,10 +74,10 @@ export default function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — show 5 key items */}
       <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-background/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-7">
-          {navItems.map(item => {
+        <div className="grid grid-cols-5">
+          {mobileNavItems.map(item => {
             const Icon = item.icon;
             const active = location.pathname.startsWith(item.to);
             return (
