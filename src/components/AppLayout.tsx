@@ -11,6 +11,7 @@ const navItems = [
   { to: "/stylist", label: "Stylist", icon: Sparkles },
   { to: "/tryon", label: "Try-On", icon: Wand2 },
   { to: "/studio", label: "Studio", icon: Camera },
+  { to: "/looks", label: "Looks", icon: Shirt },
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/lookbook", label: "Lookbook", icon: BookHeart },
   { to: "/wishlist", label: "Alerts", icon: Heart },
@@ -21,6 +22,7 @@ export default function AppLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { theme, toggle } = useTheme();
+  useOnboardingGuard();
 
   if (loading) {
     return (
