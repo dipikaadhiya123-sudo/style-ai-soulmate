@@ -83,7 +83,7 @@ export default function Landing() {
       </section>
 
       <section className="container pb-24">
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {[
             { icon: Wand2, t: "Virtual try-on", d: "Upload your photo and any product — paste a link or upload an image. See it on you in seconds." },
             { icon: Camera, t: "Photo studio", d: "Upload your face and full-body photos. We'll analyze skin tone, hair, and proportions." },
