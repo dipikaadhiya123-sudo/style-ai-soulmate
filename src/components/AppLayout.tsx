@@ -18,7 +18,15 @@ const navItems = [
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 
-export default function AppLayout() {
+// Mobile bottom nav: only 5 key items for a clean, touchable layout
+const mobileNavItems = [
+  { to: "/stylist", label: "Style", icon: Sparkles },
+  { to: "/tryon", label: "Try-On", icon: Wand2 },
+  { to: "/looks", label: "Looks", icon: Shirt },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
+  { to: "/profile", label: "Profile", icon: UserIcon },
+];
+
   const { user, loading } = useAuth();
   const location = useLocation();
   const { theme, toggle } = useTheme();
