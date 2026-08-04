@@ -405,7 +405,7 @@ export default function TryOn() {
           Try it on in one tap
         </h1>
         <p className="text-muted-foreground mb-8 max-w-xl">
-          Upload your photo and the product photo. We'll do the rest.
+          Upload your photo, then add a product photo, paste a link, or type a product name. We'll do the rest.
         </p>
       </motion.div>
 
