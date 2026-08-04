@@ -85,8 +85,9 @@ export default function Landing() {
       <section className="container pb-24">
         <div className="grid md:grid-cols-3 gap-5">
           {[
+            { icon: Wand2, t: "Virtual try-on", d: "Upload your photo and any product — paste a link or upload an image. See it on you in seconds." },
             { icon: Camera, t: "Photo studio", d: "Upload your face and full-body photos. We'll analyze skin tone, hair, and proportions." },
-            { icon: Wand2, t: "Curated outfits", d: "Get a head-to-toe look for any occasion — from beach wedding to office Monday." },
+            { icon: Sparkles, t: "Curated outfits", d: "Get a head-to-toe look for any occasion — from beach wedding to office Monday." },
             { icon: MessageSquare, t: "Stylist chat", d: "Ask anything: 'Does navy suit my skin tone?' Get instant, context-aware answers." },
           ].map(({ icon: Icon, t, d }, i) => (
             <motion.div
@@ -107,9 +108,27 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="container py-8 border-t border-border text-xs text-muted-foreground flex justify-between">
-        <span>© {new Date().getFullYear()} StyleAI</span>
-        <span>Crafted with care</span>
+      <footer className="container py-10 border-t border-border">
+        <div className="flex flex-col sm:flex-row justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
+              <span className="inline-block w-6 h-6 rounded-md bg-gradient-accent" />
+              StyleAI
+            </div>
+            <p className="text-xs text-muted-foreground max-w-xs">Your personal AI stylist — try on, style, and shop with confidence.</p>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+            <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
+            <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link to="/refunds" className="hover:text-foreground transition-colors">Refunds</Link>
+            <Link to="/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
+            <Link to="/guidelines" className="hover:text-foreground transition-colors">Guidelines</Link>
+            <Link to="/copyright" className="hover:text-foreground transition-colors">Copyright</Link>
+          </div>
+        </div>
+        <div className="mt-6 text-xs text-muted-foreground">© {new Date().getFullYear()} StyleAI. All rights reserved.</div>
       </footer>
     </div>
   );
