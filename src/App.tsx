@@ -12,6 +12,7 @@ import Studio from "./pages/Studio";
 import Stylist from "./pages/Stylist";
 import TryOn from "./pages/TryOn";
 import Lookbook from "./pages/Lookbook";
+import MyLooks from "./pages/MyLooks";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import SharedOutfit from "./pages/SharedOutfit";
