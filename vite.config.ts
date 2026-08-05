@@ -12,6 +12,11 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  build: {
+    // Broad Safari/iOS support so older mobile browsers don't fail to parse
+    // the bundle and render a blank page.
+    target: ["es2019", "safari13", "chrome80", "firefox78"],
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
