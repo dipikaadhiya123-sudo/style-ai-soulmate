@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, Camera, MessageSquare, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,8 @@ export default function Landing() {
         </div>
         <div className="mt-6 text-xs text-muted-foreground">© {new Date().getFullYear()} StyleAI. All rights reserved.</div>
       </footer>
+
+      <PWAInstallPrompt />
     </div>
   );
 }

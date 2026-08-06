@@ -1,14 +1,23 @@
 {
   "name": "StyleAI — Smart Personal Stylist",
   "short_name": "StyleAI",
-  "description": "AI-powered personal styling tailored to you.",
-  "start_url": "/",
+  "description": "AI-powered personal styling, virtual try-on, and curated shopping.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#F8F4EF",
+  "theme_color": "#C7432A",
   "orientation": "portrait",
+  "categories": ["lifestyle", "shopping", "photo", "video"],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Virtual Try-On", "short_name": "Try-On", "description": "Try on a product from a link or photo", "url": "/tryon?source=shortcut", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My Stylist", "short_name": "Stylist", "description": "Get a personalized outfit recommendation", "url": "/stylist?source=shortcut", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My Looks", "short_name": "Looks", "description": "View saved try-ons and outfits", "url": "/looks?source=shortcut", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
   ]
 }

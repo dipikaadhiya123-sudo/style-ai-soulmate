@@ -1,4 +1,5 @@
 import { Outlet, Link, Navigate, useLocation } from "react-router-dom";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import { Sparkles, Camera, MessageSquare, BookHeart, User as UserIcon, Moon, Sun, Wand2, Heart, Shirt } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -105,6 +106,8 @@ export default function AppLayout() {
           })}
         </div>
       </nav>
+
+      <PWAInstallPrompt />
     </div>
   );
 }
