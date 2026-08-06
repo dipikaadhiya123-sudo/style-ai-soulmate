@@ -131,6 +131,8 @@ export default function Landing() {
         </div>
         <div className="mt-6 text-xs text-muted-foreground">© {new Date().getFullYear()} StyleAI. All rights reserved.</div>
       </footer>
+
+      <PWAInstallPrompt />
     </div>
   );
 }

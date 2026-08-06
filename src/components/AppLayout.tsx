@@ -106,6 +106,8 @@ export default function AppLayout() {
           })}
         </div>
       </nav>
+
+      <PWAInstallPrompt />
     </div>
   );
 }
