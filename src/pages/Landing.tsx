@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, Camera, MessageSquare, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
