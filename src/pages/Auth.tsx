@@ -32,6 +32,10 @@ const getAuthErrorMessage = (err: AuthError | null): string | null => {
     return "An account with this email already exists. Please sign in.";
   if (err.message?.includes("Password should be"))
     return "Password must be at least 6 characters.";
+  if ((err as { code?: string }).code === "weak_password" || err.message?.toLowerCase().includes("weak"))
+    return "This password is too common or has appeared in a data breach. Please pick a stronger one.";
+  if (err.message?.includes("Email address") && err.message?.includes("invalid"))
+    return "That email address isn't accepted. Please use a different one.";
   if (err.message?.includes("rate limit") || err.message?.includes("too many requests"))
     return "Too many attempts. Please wait a moment and try again.";
   return err.message || null;
