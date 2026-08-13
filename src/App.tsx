@@ -14,7 +14,36 @@ import NotFound from "./pages/NotFound";
 
 // Eager: Landing, Auth, AuthCallback, NotFound — critical first-paint routes.
 // Lazy: everything else — only loaded when the user navigates to them.
-const Onboarding = lazy(() => import("./pages/Onboarding"));
+//
+// After a new deploy, an old cached index can reference chunk files that no
+// longer exist. That rejects the dynamic import and leaves a blank screen, so
+// we retry once and then force a single hard reload to pick up fresh assets.
+const RELOAD_KEY = "chunk-reload-attempted";
+
+function lazyPage<T extends { default: React.ComponentType<unknown> }>(
+  factory: () => Promise<T>,
+) {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      sessionStorage.removeItem(RELOAD_KEY);
+      return mod;
+    } catch (error) {
+      try {
+        return await factory();
+      } catch (retryError) {
+        if (!sessionStorage.getItem(RELOAD_KEY)) {
+          sessionStorage.setItem(RELOAD_KEY, "1");
+          window.location.reload();
+        }
+        throw retryError;
+      }
+    }
+  });
+}
+
+const Onboarding = lazyPage(() => import("./pages/Onboarding"));
+
 const Studio = lazy(() => import("./pages/Studio"));
 const Stylist = lazy(() => import("./pages/Stylist"));
 const TryOn = lazy(() => import("./pages/TryOn"));
