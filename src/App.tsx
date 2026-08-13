@@ -44,28 +44,28 @@ function lazyPage<T extends { default: React.ComponentType<unknown> }>(
 
 const Onboarding = lazyPage(() => import("./pages/Onboarding"));
 
-const Studio = lazy(() => import("./pages/Studio"));
-const Stylist = lazy(() => import("./pages/Stylist"));
-const TryOn = lazy(() => import("./pages/TryOn"));
-const Lookbook = lazy(() => import("./pages/Lookbook"));
-const MyLooks = lazy(() => import("./pages/MyLooks"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Profile = lazy(() => import("./pages/Profile"));
-const SharedOutfit = lazy(() => import("./pages/SharedOutfit"));
-const SharedLook = lazy(() => import("./pages/SharedLook"));
-const Wishlist = lazy(() => import("./pages/Wishlist"));
-const SubscriptionPage = lazy(() => import("./pages/subscription/SubscriptionPage"));
-const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
-const AdminRevenue = lazy(() => import("./pages/AdminRevenue"));
-const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
-const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
-const RefundPolicy = lazy(() => import("./pages/legal/RefundPolicy"));
-const CookiePolicy = lazy(() => import("./pages/legal/CookiePolicy"));
-const CommunityGuidelines = lazy(() => import("./pages/legal/CommunityGuidelines"));
-const ContentModerationPolicy = lazy(() => import("./pages/legal/ContentModerationPolicy"));
-const CopyrightPolicy = lazy(() => import("./pages/legal/CopyrightPolicy"));
-const ContactUs = lazy(() => import("./pages/legal/ContactUs"));
-const AboutUs = lazy(() => import("./pages/legal/AboutUs"));
+const Studio = lazyPage(() => import("./pages/Studio"));
+const Stylist = lazyPage(() => import("./pages/Stylist"));
+const TryOn = lazyPage(() => import("./pages/TryOn"));
+const Lookbook = lazyPage(() => import("./pages/Lookbook"));
+const MyLooks = lazyPage(() => import("./pages/MyLooks"));
+const Chat = lazyPage(() => import("./pages/Chat"));
+const Profile = lazyPage(() => import("./pages/Profile"));
+const SharedOutfit = lazyPage(() => import("./pages/SharedOutfit"));
+const SharedLook = lazyPage(() => import("./pages/SharedLook"));
+const Wishlist = lazyPage(() => import("./pages/Wishlist"));
+const SubscriptionPage = lazyPage(() => import("./pages/subscription/SubscriptionPage"));
+const PaymentHistory = lazyPage(() => import("./pages/PaymentHistory"));
+const AdminRevenue = lazyPage(() => import("./pages/AdminRevenue"));
+const PrivacyPolicy = lazyPage(() => import("./pages/legal/PrivacyPolicy"));
+const TermsOfService = lazyPage(() => import("./pages/legal/TermsOfService"));
+const RefundPolicy = lazyPage(() => import("./pages/legal/RefundPolicy"));
+const CookiePolicy = lazyPage(() => import("./pages/legal/CookiePolicy"));
+const CommunityGuidelines = lazyPage(() => import("./pages/legal/CommunityGuidelines"));
+const ContentModerationPolicy = lazyPage(() => import("./pages/legal/ContentModerationPolicy"));
+const CopyrightPolicy = lazyPage(() => import("./pages/legal/CopyrightPolicy"));
+const ContactUs = lazyPage(() => import("./pages/legal/ContactUs"));
+const AboutUs = lazyPage(() => import("./pages/legal/AboutUs"));
 
 const queryClient = new QueryClient();
 
