@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -20,7 +20,7 @@ import NotFound from "./pages/NotFound";
 // we retry once and then force a single hard reload to pick up fresh assets.
 const RELOAD_KEY = "chunk-reload-attempted";
 
-function lazyPage<T extends { default: React.ComponentType<unknown> }>(
+function lazyPage<T extends { default: ComponentType<any> }>(
   factory: () => Promise<T>,
 ) {
   return lazy(async () => {
