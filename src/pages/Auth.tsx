@@ -109,8 +109,8 @@ export default function Auth() {
       // Persist intended destination so we can restore it after the session hydrates
       try { sessionStorage.setItem("postAuthRedirect", redirectTo); } catch { /* ignore */ }
 
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: '${window.location.origin}/auth/callback',
+      const result = await lovable.auth.signInWithOAuth("google",{
+        redirect_uri: window.location.origin + "/auth/callback",
       });
 
       if (result.error) {
