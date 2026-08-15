@@ -2,6 +2,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_REDIRECT = "/stylist";
 
+const APP_ROUTES = new Set([
+  "/onboarding",
+  "/studio",
+  "/stylist",
+  "/tryon",
+  "/lookbook",
+  "/looks",
+  "/chat",
+  "/wishlist",
+  "/profile",
+  "/subscription",
+  "/payment-history",
+]);
+
 const AUTH_PARAM_KEYS = new Set([
   "access_token",
   "refresh_token",
@@ -23,10 +37,33 @@ export function getSafeAuthRedirect(rawRedirect?: string | null) {
     if (!redirect.startsWith("/") || redirect.startsWith("//") || redirect.startsWith("/auth")) {
       return DEFAULT_REDIRECT;
     }
+
+    const pathname = redirect.split(/[?#]/, 1)[0];
+    if (!APP_ROUTES.has(pathname)) return DEFAULT_REDIRECT;
+
     return redirect;
   } catch {
     return DEFAULT_REDIRECT;
   }
+}
+
+export function rememberAuthRedirect(redirectPath: string) {
+  try {
+    sessionStorage.setItem("postAuthRedirect", getSafeAuthRedirect(redirectPath));
+  } catch {
+    // Storage can be unavailable in private browsing; the callback has a safe default.
+  }
+}
+
+export function consumeAuthRedirect(fallback?: string | null) {
+  let storedRedirect: string | null = null;
+  try {
+    storedRedirect = sessionStorage.getItem("postAuthRedirect");
+    sessionStorage.removeItem("postAuthRedirect");
+  } catch {
+    // Use the callback query parameter or the safe default.
+  }
+  return getSafeAuthRedirect(storedRedirect ?? fallback);
 }
 
 export function getAuthRedirectFromSearch(search: string) {
