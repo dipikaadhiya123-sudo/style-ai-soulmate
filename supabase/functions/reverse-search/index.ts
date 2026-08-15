@@ -1,5 +1,7 @@
 // Reverse-search a product image: identify it with Gemini vision, then
 // return candidate retailers + ready-to-use search links. No paid API needed.
+import { createClient } from "npm:@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -9,8 +11,32 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return json({ error: "Unauthorized" }, 401);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !anonKey) return json({ error: "Backend auth is not configured" }, 500);
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError || !authData.user) return json({ error: "Unauthorized" }, 401);
+
     const { imageUrl, category } = (await req.json().catch(() => ({}))) ?? {};
     if (!imageUrl) return json({ error: "imageUrl required" }, 400);
+    let parsedImageUrl: URL;
+    try {
+      parsedImageUrl = new URL(imageUrl);
+    } catch {
+      return json({ error: "Please provide a valid image URL" }, 400);
+    }
+    if (!['http:', 'https:'].includes(parsedImageUrl.protocol)) {
+      return json({ error: "Only http and https image URLs are supported" }, 400);
+    }
+    const hostname = parsedImageUrl.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname.endsWith(".local")) {
+      return json({ error: "Private network URLs are not supported" }, 400);
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return json({ error: "AI not configured" }, 500);

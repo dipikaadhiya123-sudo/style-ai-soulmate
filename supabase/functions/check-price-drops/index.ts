@@ -13,21 +13,34 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return json({ error: "AI not configured" }, 500);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Optional explicit single-item check from UI
-  let onlyId: string | undefined;
-  try { const b = await req.json(); onlyId = b?.itemId; } catch { /* cron has no body */ }
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "Unauthorized" }, 401);
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: authData, error: authError } = await userClient.auth.getUser();
+  if (authError || !authData.user) return json({ error: "Unauthorized" }, 401);
 
-  // Pull a batch — items not checked in last 6h, or all if onlyId
-  const q = admin.from("wishlist_items").select("*").eq("active", true).limit(25);
-  const { data: items, error } = onlyId
-    ? await admin.from("wishlist_items").select("*").eq("id", onlyId).limit(1)
-    : await q.order("last_checked_at", { ascending: true, nullsFirst: true });
+  // User-triggered checks are limited to one wishlist item owned by that user.
+  let onlyId: string | undefined;
+  try { const b = await req.json(); onlyId = b?.itemId; } catch { /* invalid body handled below */ }
+  if (!onlyId) return json({ error: "itemId is required" }, 400);
+
+  const { data: items, error } = await admin
+    .from("wishlist_items")
+    .select("*")
+    .eq("id", onlyId)
+    .eq("user_id", authData.user.id)
+    .eq("active", true)
+    .limit(1);
   if (error) return json({ error: error.message }, 500);
+  if (!items?.length) return json({ error: "Wishlist item not found" }, 404);
 
   let checked = 0, notified = 0;
   for (const it of items ?? []) {

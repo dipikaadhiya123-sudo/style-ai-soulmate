@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/useAuth";
-import { getAuthRedirectFromSearch } from "@/lib/authRedirect";
+import { getAuthRedirectFromSearch, rememberAuthRedirect } from "@/lib/authRedirect";
 import type { AuthError } from "@supabase/supabase-js";
 
 const getErrorMessage = (err: unknown, fallback: string) => {
@@ -106,8 +106,8 @@ export default function Auth() {
     if (googleLoading) return;
     setGoogleLoading(true);
     try {
-      // Persist intended destination so we can restore it after the session hydrates
-      try { sessionStorage.setItem("postAuthRedirect", redirectTo); } catch { /* ignore */ }
+      // Persist the destination because the managed provider callback only returns auth data.
+      rememberAuthRedirect(redirectTo);
 
       const result = await lovable.auth.signInWithOAuth("google",{
         redirect_uri: window.location.origin + "/auth/callback",

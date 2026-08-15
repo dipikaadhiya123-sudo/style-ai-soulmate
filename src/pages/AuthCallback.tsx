@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getSafeAuthRedirect } from "@/lib/authRedirect";
+import { consumeAuthRedirect } from "@/lib/authRedirect";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export default function AuthCallback() {
         const redirectRaw = sp.get("redirect");
 
         if (errorDesc) throw new Error(errorDesc);
-        const redirectTo = getSafeAuthRedirect(redirectRaw);
+        const redirectTo = consumeAuthRedirect(redirectRaw);
 
         setMessage("Verifying your identity\u2026");
 
