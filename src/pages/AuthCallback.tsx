@@ -62,7 +62,7 @@ export default function AuthCallback() {
           console.log("Session:", data.session);
           console.log("Session Error:", sessionError);
 
-        if (exchangeErr) throw exchangeErr;
+          if (exchangeErr) throw exchangeErr;
       
         } else if (accessToken && refreshToken) {
           setMessage("Setting up your session\u2026");
