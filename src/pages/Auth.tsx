@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectFromSearch, rememberAuthRedirect } from "@/lib/authRedirect";
 import type { AuthError } from "@supabase/supabase-js";
 
@@ -103,34 +101,34 @@ export default function Auth() {
   };
 
   const handleGoogle = async () => {
-    if (googleLoading) return;
-    setGoogleLoading(true);
-    try {
-      // Persist the destination because the managed provider callback only returns auth data.
-      rememberAuthRedirect(redirectTo);
+  if (googleLoading) return;
+  setGoogleLoading(true);
+  try {
+    // Persist the destination because the callback only returns auth data.
+    rememberAuthRedirect(redirectTo);
 
-      const result = await lovable.auth.signInWithOAuth("google",{
-        redirect_uri: window.location.origin + "/auth/callback",
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/auth/callback",
+      },
+    });
+
+    if (error) {
+      toast.error(error.message || "Google Sign-In failed.", {
+        description: "Try again in a moment, or use email sign-in.",
+        duration: 6000,
       });
-
-      if (result.error) {
-        toast.error(result.error.message || "Google Sign-In failed.", {
-          description: "Try again in a moment, or use email sign-in.",
-          duration: 6000,
-        });
-        return;
-      }
-
-      if (result.redirected) return; // browser will navigate away
-
-      // Popup flow completed: session is set — go to intended destination
-      navigate(redirectTo, { replace: true });
-    } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Google Sign-In failed."));
-    } finally {
       setGoogleLoading(false);
+      return;
     }
-  };
+    // Browser redirects to Google automatically — no further code runs here.
+  } catch (err: unknown) {
+    toast.error(getErrorMessage(err, "Google Sign-In failed."));
+    setGoogleLoading(false);
+  }
+};
+
 
   if (authLoading) {
     return (
