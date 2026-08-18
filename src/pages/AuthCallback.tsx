@@ -63,7 +63,7 @@ export default function AuthCallback() {
           console.log("Session Error:", sessionError);
 
         if (exchangeErr) throw exchangeErr;
-          const { data } = await supabase.auth.getSession();
+      
         } else if (accessToken && refreshToken) {
           setMessage("Setting up your session\u2026");
           const { error: sessionErr } = await supabase.auth.setSession({
