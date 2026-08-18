@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -48,9 +49,20 @@ export default function AuthCallback() {
         setMessage("Verifying your identity\u2026");
 
         if (code) {
-          setMessage("Exchanging code for session\u2026");
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeErr) throw exchangeErr; 
+          setMessage("Exchanging code for session…");
+
+          const { error: exchangeErr } =
+          await supabase.auth.exchangeCodeForSession(code);
+
+          console.log("Exchange Error:", exchangeErr);
+
+          const { data, error: sessionError } =
+          await supabase.auth.getSession();
+
+          console.log("Session:", data.session);
+          console.log("Session Error:", sessionError);
+
+        if (exchangeErr) throw exchangeErr;
           const { data } = await supabase.auth.getSession();
         } else if (accessToken && refreshToken) {
           setMessage("Setting up your session\u2026");
