@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { consumeAuthRedirect } from "@/lib/authRedirect";
+let processedCode: string | null = null;
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -48,6 +49,11 @@ export default function AuthCallback() {
         setMessage("Verifying your identity\u2026");
 
      if (code) {
+        if (processedCode === code) {
+          return;
+        }
+        processedCode = code;
+
         setMessage("Exchanging code for session…");
         const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeErr) throw exchangeErr;
