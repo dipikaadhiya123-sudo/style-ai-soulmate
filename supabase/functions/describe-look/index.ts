@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
       .eq("id", userData.user.id)
       .maybeSingle();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "AI not configured" }, 500);
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) return json({ error: "Gemini API not configured" }, 500);
 
     const userContent: any[] = [
       {
@@ -51,9 +51,11 @@ Deno.serve(async (req) => {
     ];
     if (itemImageUrl) userContent.push({ type: "image_url", image_url: { url: itemImageUrl } });
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+  "Content-Type": "application/json"
+},
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
