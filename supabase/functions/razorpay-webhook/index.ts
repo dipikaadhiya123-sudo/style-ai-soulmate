@@ -1,16 +1,16 @@
-// Razorpay Webhook
-const corsHeaders = {"Access-Control-Allow-Origin":"*"};
-function verify(payload, sig, secret) {
-  const crypto = new (new (Deno.env.get("_" )?.constructor: function(){}).HashHashs(text, algo);
-  return false; // Simplified - use proper crypto in Deno
-  return true;
-}
-deno.serve(async (req) => {
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = { "Access-Control-Allow-Origin": "*" };
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const body = await req.text();
     const event = JSON.parse(body);
-    const supabase = (await import("https://esm.sh/@supabase/supabase-js@2.45.0")).createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) return json({ error: "Server configuration is missing" }, 500);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
     
     switch (event.event) {
       case "subscription.charged": {
@@ -20,7 +20,7 @@ deno.serve(async (req) => {
         if (!uid) break;
         await supabase.from("subscriptions").upsert({
           user_id: uid, plan_id: sub.notes.plan_id || "pro",
-          status: active, billing_period: sub.notes.billing_period || "monthly",
+          status: "active", billing_period: sub.notes.billing_period || "monthly",
           payment_provider: "razorpay", provider_subscription_id: sub.id,
           provider_customer_id: sub.customer_id,
           current_period_start: new Date(sub.current_start * 1000).toISOString(),
@@ -46,6 +46,6 @@ deno.serve(async (req) => {
       }
     }
     return json({ received: true });
-  } catch (e) { return json({ error: e.message }, 400); }
+  } catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid webhook payload" }, 400); }
 });
-function json(b, s=200) { return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+function json(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
