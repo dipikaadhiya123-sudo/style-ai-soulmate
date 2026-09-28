@@ -1,6 +1,7 @@
 // Generate a textual "look" description that imagines the user wearing the chosen item.
 // No image rendering — returns prose + bullet highlights only.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { geminiStructured, GeminiError, fetchAsInlineData, type GeminiPart } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,74 +37,58 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) return json({ error: "Gemini API not configured" }, 500);
+    if (!GEMINI_API_KEY) return json({ error: "AI not configured" }, 500);
 
-    const userContent: any[] = [
+    const userParts: GeminiPart[] = [
       {
-        type: "text",
         text:
           `Imagine the person in this photo wearing this ${category}: "${itemLabel}". ` +
           `Describe how the look would come together — fit, color harmony with their skin/hair, silhouette, and styling notes. ` +
           `Do NOT describe rendering an image. Be vivid but grounded. ` +
           `Profile context: ${JSON.stringify(profile ?? {})}.`,
       },
-      { type: "image_url", image_url: { url: signed.signedUrl } },
+      await fetchAsInlineData(signed.signedUrl).then((d) => ({ inlineData: d })),
     ];
-    if (itemImageUrl) userContent.push({ type: "image_url", image_url: { url: itemImageUrl } });
-
-    const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: {
-  "Content-Type": "application/json"
-},
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a precise, warm fashion stylist. Concise, specific, never generic." },
-          { role: "user", content: userContent },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "report_look",
-            description: "Return a textual look description.",
-            parameters: {
-              type: "object",
-              properties: {
-                description: { type: "string", description: "2–4 sentence vivid description of the imagined look." },
-                highlights: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      label: { type: "string" },
-                      detail: { type: "string" },
-                    },
-                    required: ["label", "detail"],
-                    additionalProperties: false,
-                  },
-                  description: "3–5 short bullets: fit, color harmony, silhouette, styling tip.",
-                },
-              },
-              required: ["description", "highlights"],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "report_look" } },
-      }),
-    });
-
-    if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
-    if (aiResp.status === 402) return json({ error: "AI credits exhausted" }, 402);
-    if (!aiResp.ok) {
-      console.error("AI error", aiResp.status, await aiResp.text());
-      return json({ error: "AI failed" }, 500);
+    if (itemImageUrl) {
+      try {
+        userParts.push({ inlineData: await fetchAsInlineData(itemImageUrl) });
+      } catch (e) {
+        console.error("item image fetch failed", e);
+      }
     }
 
-    const aiData = await aiResp.json();
-    const args = aiData.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const result = args ? JSON.parse(args) : null;
+    const schema = {
+      type: "object",
+      properties: {
+        description: { type: "string", description: "2–4 sentence vivid description of the imagined look." },
+        highlights: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string" },
+              detail: { type: "string" },
+            },
+            required: ["label", "detail"],
+          },
+          description: "3–5 short bullets: fit, color harmony, silhouette, styling tip.",
+        },
+      },
+      required: ["description", "highlights"],
+    };
+
+    let result: any;
+    try {
+      result = await geminiStructured({
+        apiKey: GEMINI_API_KEY,
+        system: "You are a precise, warm fashion stylist. Concise, specific, never generic.",
+        parts: userParts,
+        schema,
+      });
+    } catch (e) {
+      if (e instanceof GeminiError) return json({ error: e.message }, e.status);
+      throw e;
+    }
     if (!result) return json({ error: "No result" }, 500);
 
     return json(result);
