@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";import { useAuth } from "@/hooks/useAuth";
-import { getAuthRedirectFromSearch, rememberAuthRedirect } from "@/lib/authRedirect";
+import { lovable } from "@/integrations/lovable";
+import { buildAuthCallbackUrl, getAuthRedirectFromSearch, rememberAuthRedirect } from "@/lib/authRedirect";
 import type { AuthError } from "@supabase/supabase-js";
 
 const getErrorMessage = (err: unknown, fallback: string) => {
@@ -107,11 +108,8 @@ export default function Auth() {
     // Persist the destination because the callback only returns auth data.
     rememberAuthRedirect(redirectTo);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin + "/auth/callback",
-      },
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: buildAuthCallbackUrl(redirectTo),
     });
 
     if (error) {
