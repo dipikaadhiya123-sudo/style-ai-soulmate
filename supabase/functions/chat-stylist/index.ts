@@ -1,5 +1,6 @@
 // Streaming AI stylist chat with profile context
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { geminiStreamAsOpenAiSse } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,27 +49,17 @@ Guidelines:
 - Use markdown lists for outfit suggestions.
 - Keep replies focused and conversational.`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY not configured" }, 500);
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY not configured" }, 500);
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        stream: true,
-        messages: [{ role: "system", content: system }, ...messages],
-      }),
-    });
+    const contents = messages.map((m: { role: string; content: string }) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
-    if (aiResp.status === 429) return json({ error: "Rate limited" }, 429);
-    if (aiResp.status === 402) return json({ error: "AI credits exhausted" }, 402);
-    if (!aiResp.ok) {
-      console.error("AI error", aiResp.status, await aiResp.text());
-      return json({ error: "AI gateway error" }, 500);
-    }
+    const stream = geminiStreamAsOpenAiSse({ apiKey: GEMINI_API_KEY, system, contents });
 
-    return new Response(aiResp.body, {
+    return new Response(stream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
