@@ -1,5 +1,6 @@
 // Analyze user's face + body photos with Gemini vision and write structured analysis to profile
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { geminiStructured, GeminiError, type GeminiPart } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +34,7 @@ Deno.serve(async (req) => {
       return json({ error: "No photos uploaded" }, 400);
     }
 
-    const imageContents: any[] = [];
+    const imageParts: GeminiPart[] = [];
     for (const path of [profile.face_photo_path, profile.body_photo_path].filter(Boolean) as string[]) {
       const { data: signed } = await supabase.storage.from("user-photos").createSignedUrl(path, 600);
       if (signed?.signedUrl) {
@@ -46,65 +47,42 @@ Deno.serve(async (req) => {
         }
         const b64 = btoa(bin);
         const mime = r.headers.get("content-type") || "image/jpeg";
-        imageContents.push({ type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } });
+        imageParts.push({ inlineData: { mimeType: mime, data: b64 } });
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY not configured" }, 500);
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY not configured" }, 500);
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a professional image analyst for fashion styling. Be concise, descriptive, never judgmental. Avoid identifying real people." },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Analyze the photo(s) and extract styling-relevant attributes." },
-              ...imageContents,
-            ],
-          },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "report_analysis",
-            description: "Report visual analysis for styling.",
-            parameters: {
-              type: "object",
-              properties: {
-                skin_undertone: { type: "string", enum: ["warm", "cool", "neutral", "olive"] },
-                skin_tone_shade: { type: "string", description: "fair / light / medium / tan / deep" },
-                hair_color: { type: "string" },
-                hair_style: { type: "string" },
-                face_shape: { type: "string", enum: ["oval", "round", "square", "heart", "long", "diamond"] },
-                eye_color: { type: "string" },
-                body_proportions: { type: "string", description: "Brief proportions note (torso/legs/shoulders)" },
-                recommended_colors: { type: "array", items: { type: "string" }, description: "5-7 color names that flatter" },
-                colors_to_avoid: { type: "array", items: { type: "string" } },
-              },
-              required: ["skin_undertone", "skin_tone_shade", "recommended_colors"],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "report_analysis" } },
-      }),
-    });
+    const schema = {
+      type: "object",
+      properties: {
+        skin_undertone: { type: "string", enum: ["warm", "cool", "neutral", "olive"] },
+        skin_tone_shade: { type: "string", description: "fair / light / medium / tan / deep" },
+        hair_color: { type: "string" },
+        hair_style: { type: "string" },
+        face_shape: { type: "string", enum: ["oval", "round", "square", "heart", "long", "diamond"] },
+        eye_color: { type: "string" },
+        body_proportions: { type: "string", description: "Brief proportions note (torso/legs/shoulders)" },
+        recommended_colors: { type: "array", items: { type: "string" }, description: "5-7 color names that flatter" },
+        colors_to_avoid: { type: "array", items: { type: "string" } },
+      },
+      required: ["skin_undertone", "skin_tone_shade", "recommended_colors"],
+    };
 
-    if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
-    if (aiResp.status === 402) return json({ error: "AI credits exhausted" }, 402);
-    if (!aiResp.ok) {
-      console.error("AI gateway error", aiResp.status, await aiResp.text());
-      return json({ error: "AI analysis failed" }, 500);
+    let analysis: any;
+    try {
+      analysis = await geminiStructured({
+        apiKey: GEMINI_API_KEY,
+        system:
+          "You are a professional image analyst for fashion styling. Be concise, descriptive, never judgmental. Avoid identifying real people.",
+        parts: [{ text: "Analyze the photo(s) and extract styling-relevant attributes." }, ...imageParts],
+        schema,
+      });
+    } catch (e) {
+      if (e instanceof GeminiError) return json({ error: e.message }, e.status);
+      throw e;
     }
-
-    const aiData = await aiResp.json();
-    const args = aiData.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const analysis = args ? JSON.parse(args) : null;
     if (!analysis) return json({ error: "No analysis returned" }, 500);
 
     await supabase.from("profiles").update({ ai_analysis: analysis }).eq("id", userId);
