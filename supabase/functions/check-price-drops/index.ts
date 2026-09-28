@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { geminiStructured, GeminiError } from "../_shared/gemini.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -14,8 +15,8 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return json({ error: "AI not configured" }, 500);
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) return json({ error: "AI not configured" }, 500);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
     try {
       const html = await fetchText(it.source_url);
       if (!html) continue;
-      const price = await extractPriceWithAI(html, it.title, it.currency, LOVABLE_API_KEY);
+      const price = await extractPriceWithAI(html, it.title, it.currency, GEMINI_API_KEY);
       checked++;
 
       const dropVsTarget = it.target_price != null && price != null && price <= Number(it.target_price);
@@ -96,40 +97,25 @@ async function fetchText(url: string): Promise<string | null> {
 }
 
 async function extractPriceWithAI(
-  html: string, title: string, currency: string, key: string,
+  html: string, title: string, currency: string, apiKey: string,
 ): Promise<number | null> {
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash-lite",
-      messages: [
-        { role: "system", content: "Extract the current selling price (after discount) from a product page HTML." },
-        { role: "user",   content: `Product: "${title}". Currency: ${currency}. Return just the number.\n\nHTML:\n${html}` },
-      ],
-      tools: [{
-        type: "function",
-        function: {
-          name: "return_price",
-          description: "Return the current selling price as a number, or null if not found.",
-          parameters: {
-            type: "object",
-            properties: { price: { type: ["number", "null"] } },
-            required: ["price"], additionalProperties: false,
-          },
-        },
-      }],
-      tool_choice: { type: "function", function: { name: "return_price" } },
-    }),
-  });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-  if (!args) return null;
   try {
-    const p = JSON.parse(args).price;
+    const result = await geminiStructured({
+      apiKey,
+      system: "Extract the current selling price (after discount) from a product page HTML. If not found, return 0.",
+      parts: [{ text: `Product: "${title}". Currency: ${currency}. Return just the price number (0 if unknown).\n\nHTML:\n${html}` }],
+      schema: {
+        type: "object",
+        properties: { price: { type: "number" } },
+        required: ["price"],
+      },
+    });
+    const p = result?.price;
     return typeof p === "number" && isFinite(p) && p > 0 ? p : null;
-  } catch { return null; }
+  } catch (e) {
+    if (!(e instanceof GeminiError)) console.error("price extraction failed", e);
+    return null;
+  }
 }
 
 function json(b: unknown, status = 200) {
