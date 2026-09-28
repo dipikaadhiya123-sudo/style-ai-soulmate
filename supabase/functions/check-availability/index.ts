@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { geminiStructured, GeminiError } from "../_shared/gemini.ts";
 
 interface Body {
   query: string;
@@ -83,9 +84,9 @@ Deno.serve(async (req) => {
     const stores = body.stores?.length ? body.stores : DEFAULT_STORES;
     const sizes = body.sizes?.length ? body.sizes : DEFAULT_SIZES;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     // 1) Pull live snippets from Firecrawl search for each requested store
     let liveSnippets: { store: string; results: { title?: string; url?: string; description?: string }[] }[] = [];
@@ -141,12 +142,10 @@ Physical boutiques to consider: ${DEFAULT_BOUTIQUES.map(b => `${b.name} (${b.cit
                     status: { type: "string", enum: ["in_stock", "limited", "out_of_stock"] },
                   },
                   required: ["size", "status"],
-                  additionalProperties: false,
                 },
               },
             },
             required: ["store", "url", "sizes"],
-            additionalProperties: false,
           },
         },
         offline: {
@@ -161,44 +160,26 @@ Physical boutiques to consider: ${DEFAULT_BOUTIQUES.map(b => `${b.name} (${b.cit
               phone: { type: "string" },
             },
             required: ["store", "city", "address", "status"],
-            additionalProperties: false,
           },
         },
       },
       required: ["online", "offline"],
-      additionalProperties: false,
     };
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: user },
-        ],
-        tools: [{
-          type: "function",
-          function: { name: "report_availability", description: "Return availability", parameters: schema },
-        }],
-        tool_choice: { type: "function", function: { name: "report_availability" } },
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const t = await aiRes.text();
-      if (aiRes.status === 429) return new Response(JSON.stringify({ error: "Rate limit, try again shortly" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (aiRes.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw new Error(`AI gateway ${aiRes.status}: ${t}`);
+    let args: any;
+    try {
+      args = await geminiStructured({
+        apiKey: GEMINI_API_KEY,
+        system: sys,
+        parts: [{ text: user }],
+        schema,
+      });
+    } catch (e) {
+      if (e instanceof GeminiError) {
+        return new Response(JSON.stringify({ error: e.message }), { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      throw e;
     }
-
-    const data = await aiRes.json();
-    const call = data.choices?.[0]?.message?.tool_calls?.[0];
-    const args = call?.function?.arguments ? JSON.parse(call.function.arguments) : null;
     if (!args) throw new Error("No structured response");
 
     return new Response(
@@ -218,3 +199,4 @@ Physical boutiques to consider: ${DEFAULT_BOUTIQUES.map(b => `${b.name} (${b.cit
     });
   }
 });
+
