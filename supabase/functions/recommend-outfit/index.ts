@@ -1,5 +1,6 @@
 // Generate a structured outfit recommendation tailored to profile + occasion
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { geminiStructured, GeminiError } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,8 +35,8 @@ Deno.serve(async (req) => {
       .eq("id", userId)
       .maybeSingle();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY not configured" }, 500);
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY not configured" }, 500);
 
     const profileSummary = profile
       ? Object.entries(profile)
@@ -44,92 +45,67 @@ Deno.serve(async (req) => {
           .join("\n")
       : "(no profile)";
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a world-class personal stylist. Recommend a complete head-to-toe outfit tailored to the user's body, skin tone, hair, and style preferences. Use specific colors (provide a CSS hex like #C2724A for each item) and concrete garment descriptions. Be warm, confident, never preachy.",
-          },
-          {
-            role: "user",
-            content: `Profile:\n${profileSummary}\n\nOccasion: ${occasion}\n\nGive me a curated outfit, a style score (1-10), and 3 bonus tips (one each from: makeup, hair, skincare/nails).`,
-          },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "recommend_outfit",
-            description: "Return a structured outfit recommendation.",
-            parameters: {
-              type: "object",
-              properties: {
-                title: { type: "string", description: "Short evocative title for the look (3-5 words)" },
-                rationale: { type: "string", description: "1-2 sentences on why this works for the user." },
-                items: {
-                  type: "array",
-                  minItems: 3,
-                  maxItems: 7,
-                  items: {
-                    type: "object",
-                    properties: {
-                      category: { type: "string", description: "e.g. Top, Bottom, Outerwear, Footwear, Accessory" },
-                      description: { type: "string", description: "Specific garment description" },
-                      color: { type: "string", description: "CSS hex color, e.g. #C2724A" },
-                    },
-                    required: ["category", "description", "color"],
-                    additionalProperties: false,
-                  },
-                },
-                style_score: { type: "number", minimum: 1, maximum: 10 },
-                score_breakdown: {
-                  type: "object",
-                  properties: {
-                    fit: { type: "number", minimum: 1, maximum: 10 },
-                    color_harmony: { type: "number", minimum: 1, maximum: 10 },
-                    occasion_match: { type: "number", minimum: 1, maximum: 10 },
-                  },
-                  required: ["fit", "color_harmony", "occasion_match"],
-                  additionalProperties: false,
-                },
-                suggestions: {
-                  type: "array",
-                  minItems: 3,
-                  maxItems: 4,
-                  items: {
-                    type: "object",
-                    properties: {
-                      category: { type: "string", enum: ["Makeup", "Hair", "Skincare", "Nails"] },
-                      tip: { type: "string" },
-                    },
-                    required: ["category", "tip"],
-                    additionalProperties: false,
-                  },
-                },
-              },
-              required: ["title", "rationale", "items", "style_score", "score_breakdown", "suggestions"],
-              additionalProperties: false,
+    const schema = {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short evocative title for the look (3-5 words)" },
+        rationale: { type: "string", description: "1-2 sentences on why this works for the user." },
+        items: {
+          type: "array",
+          minItems: 3,
+          maxItems: 7,
+          items: {
+            type: "object",
+            properties: {
+              category: { type: "string", description: "e.g. Top, Bottom, Outerwear, Footwear, Accessory" },
+              description: { type: "string", description: "Specific garment description" },
+              color: { type: "string", description: "CSS hex color, e.g. #C2724A" },
             },
+            required: ["category", "description", "color"],
           },
+        },
+        style_score: { type: "number" },
+        score_breakdown: {
+          type: "object",
+          properties: {
+            fit: { type: "number" },
+            color_harmony: { type: "number" },
+            occasion_match: { type: "number" },
+          },
+          required: ["fit", "color_harmony", "occasion_match"],
+        },
+        suggestions: {
+          type: "array",
+          minItems: 3,
+          maxItems: 4,
+          items: {
+            type: "object",
+            properties: {
+              category: { type: "string", enum: ["Makeup", "Hair", "Skincare", "Nails"] },
+              tip: { type: "string" },
+            },
+            required: ["category", "tip"],
+          },
+        },
+      },
+      required: ["title", "rationale", "items", "style_score", "score_breakdown", "suggestions"],
+    };
+
+    let rec: any;
+    try {
+      rec = await geminiStructured({
+        apiKey: GEMINI_API_KEY,
+        system:
+          "You are a world-class personal stylist. Recommend a complete head-to-toe outfit tailored to the user's body, skin tone, hair, and style preferences. Use specific colors (provide a CSS hex like #C2724A for each item) and concrete garment descriptions. Be warm, confident, never preachy. Style scores must be between 1 and 10.",
+        parts: [{
+          text: `Profile:\n${profileSummary}\n\nOccasion: ${occasion}\n\nGive me a curated outfit, a style score (1-10), and 3 bonus tips (one each from: makeup, hair, skincare/nails).`,
         }],
-        tool_choice: { type: "function", function: { name: "recommend_outfit" } },
-      }),
-    });
-
-    if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
-    if (aiResp.status === 402) return json({ error: "AI credits exhausted" }, 402);
-    if (!aiResp.ok) {
-      console.error("AI error", aiResp.status, await aiResp.text());
-      return json({ error: "AI generation failed" }, 500);
+        schema,
+      });
+    } catch (e) {
+      if (e instanceof GeminiError) return json({ error: e.message }, e.status);
+      throw e;
     }
-
-    const aiData = await aiResp.json();
-    const args = aiData.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const rec = args ? JSON.parse(args) : null;
     if (!rec) return json({ error: "No recommendation returned" }, 500);
 
     const { data: inserted, error: insErr } = await supabase
@@ -162,3 +138,4 @@ Deno.serve(async (req) => {
 function json(b: any, status = 200) {
   return new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
+
