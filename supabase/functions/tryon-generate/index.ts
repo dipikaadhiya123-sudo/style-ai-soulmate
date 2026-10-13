@@ -1,11 +1,7 @@
 // Universal AI Try-On Engine: auto-detects category, supports multiple items,
 // uses category-specific placement prompts, and schedules cleanup of unsaved originals.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
 type Category =
   | "clothes" | "footwear" | "bag" | "necklace" | "earrings" | "ring"
@@ -52,8 +48,7 @@ const PLACEMENT: Record<Category, string> = {
     "Replace the full outfit (upper + lower) with the reference items, keeping accessories untouched. Render each piece with realistic fit and layering.",
 };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -436,7 +431,7 @@ Deno.serve(async (req) => {
     console.error(e);
     return json({ error: e instanceof Error ? e.message : "Unknown" }, 500);
   }
-});
+}));
 
 function json(b: any, status = 200) {
   return new Response(JSON.stringify(b), {
