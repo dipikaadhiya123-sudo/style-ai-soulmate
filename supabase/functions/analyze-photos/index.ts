@@ -1,14 +1,9 @@
 // Analyze user's face + body photos with Gemini vision and write structured analysis to profile
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { geminiStructured, GeminiError, type GeminiPart } from "../_shared/gemini.ts";
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -92,7 +87,7 @@ Deno.serve(async (req) => {
     console.error(e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
-});
+}));
 
 function json(b: any, status = 200) {
   return new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -1,11 +1,7 @@
 // Search product/clothing images via Openverse (no API key required).
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   try {
     const { query, category } = (await req.json().catch(() => ({}))) ?? {};
@@ -44,7 +40,7 @@ Deno.serve(async (req) => {
     console.error(e);
     return json({ results: [], error: e instanceof Error ? e.message : "Unknown" }, 500);
   }
-});
+}));
 
 function json(b: any, status = 200) {
   return new Response(JSON.stringify(b), {

@@ -2,14 +2,9 @@
 // return candidate retailers + ready-to-use search links. No paid API needed.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { geminiStructured, GeminiError, fetchAsInlineData } from "../_shared/gemini.ts";
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -132,7 +127,7 @@ Deno.serve(async (req) => {
     console.error(e);
     return json({ error: e instanceof Error ? e.message : "Unknown" }, 500);
   }
-});
+}));
 
 function json(b: any, status = 200) {
   return new Response(JSON.stringify(b), {
