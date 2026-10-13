@@ -1,0 +1,2 @@
+- [ ] Apply consistent CORS handling to all Supabase Edge Functions and redeploy them.
+- [ ] Verify deployed responses include the requested CORS headers and report any deployment/test blocker.
