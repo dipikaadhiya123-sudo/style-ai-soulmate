@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-const corsHeaders ={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+import { corsHeaders, withCors } from "../_shared/cors.ts";
+Deno.serve(withCors(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
@@ -41,5 +40,5 @@ Deno.serve(async (req) => {
       completed_at: new Date().toISOString(),
     }).eq("user_id", userId);
     return json({ success: true, message: "Your account and all associated data have been permanently deleted." });
-  } catch (e: any) { return json({ error: e.message }, 500); }});
+  } catch (e: any) { return json({ error: e.message }, 500); }}));
 function json(b, s=200) { return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }

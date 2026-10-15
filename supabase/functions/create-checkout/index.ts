@@ -1,8 +1,7 @@
 // Create Checkout - Stripe or Razorpay checkout session
-const corsHeaders = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
   try {
     const {createClient} = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
     const authHeader = req.headers.get("Authorization");
@@ -60,7 +59,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
-});
+}));
 
 function json(b: any, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
