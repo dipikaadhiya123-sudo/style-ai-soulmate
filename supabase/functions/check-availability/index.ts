@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { geminiStructured, GeminiError } from "../_shared/gemini.ts";
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
 interface Body {
   query: string;
@@ -51,8 +51,7 @@ async function firecrawlSearch(query: string, apiKey: string) {
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -198,5 +197,5 @@ Physical boutiques to consider: ${DEFAULT_BOUTIQUES.map(b => `${b.name} (${b.cit
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));
 

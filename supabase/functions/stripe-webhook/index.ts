@@ -1,7 +1,6 @@
 // Stripe Webhook
-const corsHeaders = {"Access-Control-Allow-Origin":"*"};
-deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+import { corsHeaders, withCors } from "../_shared/cors.ts";
+Deno.serve(withCors(async (req) => {
   try {
     const sig = req.headers.get("stripe-signature");
     if (!sig) return json({ error: "Missing signature" }, 400);
@@ -54,5 +53,5 @@ deno.serve(async (req) => {
     }
     return json({ received: true });
   } catch (e) { return json({ error: e.message }, 400); }
-});
+}));
 function json(b, s=200) { return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }

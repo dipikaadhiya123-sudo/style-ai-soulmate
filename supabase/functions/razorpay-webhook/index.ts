@@ -1,9 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { corsHeaders, withCors } from "../_shared/cors.ts";
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*" };
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
   try {
     const body = await req.text();
     const event = JSON.parse(body);
@@ -47,5 +45,5 @@ Deno.serve(async (req) => {
     }
     return json({ received: true });
   } catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid webhook payload" }, 400); }
-});
+}));
 function json(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }); }

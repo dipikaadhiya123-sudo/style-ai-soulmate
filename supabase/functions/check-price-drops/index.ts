@@ -8,9 +8,9 @@ const corsHeaders = {
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { geminiStructured, GeminiError } from "../_shared/gemini.ts";
+import { withCors } from "../_shared/cors.ts";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(withCors(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
   }
 
   return json({ checked, notified });
-});
+}));
 
 async function fetchText(url: string): Promise<string | null> {
   try {
