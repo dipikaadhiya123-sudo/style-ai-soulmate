@@ -1,2 +1,3 @@
 - [ ] Apply consistent CORS handling to all Supabase Edge Functions and redeploy them.
 - [ ] Verify deployed responses include the requested CORS headers and report any deployment/test blocker.
+- [ ] Identify the user's GitHub-connected StyleAI Soulmate project and the “StyleAI 2026” backend/project, then assess whether this is the right source to fix.
