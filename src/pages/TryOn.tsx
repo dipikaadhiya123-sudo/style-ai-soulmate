@@ -35,6 +35,7 @@ export default function TryOn() {
   const [saving, setSaving] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultPath, setResultPath] = useState<string | null>(null);
+  const [basicPreview, setBasicPreview] = useState<{ garmentUrl: string | null; reason: string } | null>(null);
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
@@ -145,6 +146,7 @@ export default function TryOn() {
   }, [photoPreview, itemPreview]);
 
   const resetResult = () => {
+    setBasicPreview(null);
     setResultUrl(null);
     setResultPath(null);
     setSavedSlug(null);
@@ -274,6 +276,12 @@ export default function TryOn() {
         throw new Error(parsed.message);
       }
       if (data?.error) throw new Error(data.error);
+
+      if (data?.basicPreview) {
+        setBasicPreview({ garmentUrl: data.garmentUrl ?? chosen.imageUrl ?? itemPreview, reason: data.reason });
+        toast.message("Realistic AI try-on is busy — showing a free Basic Preview");
+        return;
+      }
 
       setResultUrl(data.resultUrl);
       setResultPath(data.resultPath);
@@ -604,6 +612,34 @@ export default function TryOn() {
         </Button>
       )}
 
+
+      {basicPreview && photoPreview && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] uppercase tracking-widest rounded-full border border-border px-2 py-0.5 text-muted-foreground">Basic Preview</span>
+            <h2 className="font-display text-xl font-medium">You + this item</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            This is not a realistic AI try-on — it shows your photo next to the product so you can judge the look.
+            {basicPreview.reason === "RATE_LIMITED" ? " Realistic AI try-on is busy right now; please try again in a minute." : " Realistic AI try-on is currently unavailable."}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
+              <img src={photoPreview} alt="Your photo" className="w-full aspect-[4/5] object-cover" />
+              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">You</figcaption>
+            </figure>
+            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
+              {basicPreview.garmentUrl
+                ? <img src={basicPreview.garmentUrl} alt="Product" className="w-full aspect-[4/5] object-contain bg-muted" />
+                : <div className="w-full aspect-[4/5] grid place-items-center text-xs text-muted-foreground">No product image</div>}
+              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">Product{detected?.label ? ` · ${detected.label}` : ""}</figcaption>
+            </figure>
+          </div>
+          <Button variant="outline" className="mt-4 w-full" onClick={generate} disabled={generating}>
+            <Sparkles className="w-4 h-4" /> Try realistic AI try-on again
+          </Button>
+        </motion.div>
+      )}
 
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>

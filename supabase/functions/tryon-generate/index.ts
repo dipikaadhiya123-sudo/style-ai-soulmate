@@ -233,7 +233,15 @@ Deno.serve(withCors(async (req) => {
     if (!signed?.signedUrl) return json({ error: "Photo not found" }, 404);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return json({ error: "AI not configured" }, 500);
+    // Free Basic Preview: returned instead of an error when realistic AI
+    // generation is unavailable (no key, rate limit, credits, provider outage).
+    const basicPreview = (reason: string) => json({
+      basicPreview: true,
+      reason,
+      garmentUrl: items.find((i) => i.imageUrl)?.imageUrl ?? null,
+      detected: items.map((i) => ({ category: i.category ?? "clothes", label: i.label ?? "Selected item" })),
+    });
+    if (!LOVABLE_API_KEY) return basicPreview("AI_NOT_CONFIGURED");
 
     // --- Step 1: Auto-detect category + describe each item if missing ---
     const enriched: { imageUrl?: string; label: string; category: Category }[] = [];
@@ -367,8 +375,9 @@ Deno.serve(withCors(async (req) => {
         }),
       });
 
-      if (aiResp.status === 429) return json({ error: "Rate limited, try again shortly" }, 429);
-      if (aiResp.status === 402) return json({ error: "AI credits exhausted — add credits in Settings" }, 402);
+      if (aiResp.status === 429) return basicPreview("RATE_LIMITED");
+      if (aiResp.status === 402) return basicPreview("CREDITS_EXHAUSTED");
+      if (aiResp.status >= 500) return basicPreview("AI_UNAVAILABLE");
       if (!aiResp.ok) {
         console.error("AI error", aiResp.status, await aiResp.text());
         return json({ error: "Image generation failed" }, 500);
