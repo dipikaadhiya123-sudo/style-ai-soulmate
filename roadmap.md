@@ -3,3 +3,4 @@
 - [ ] Identify the user's GitHub-connected StyleAI Soulmate project and the “StyleAI 2026” backend/project — blocked because workspace search only found StyleAI Avatar; need the intended repository/project link.
 - [ ] Restore all app features — blocked pending the intended repository/backend and required AI service configuration; a live function currently reports “AI not configured.”
 - [ ] Diagnose the uploaded StyleAI source and implement the user's zero-cost preference — code inspection found AI inference and product lookup depend on metered services; clarify whether “free” means free for app users or no AI/API spend at all before disabling or redesigning those features.
+- [ ] Set Vercel backend variables, redeploy, and verify live home/login/try-on — blocked because no Vercel connection or deployment credential is available in this workspace.
