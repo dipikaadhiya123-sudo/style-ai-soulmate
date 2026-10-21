@@ -12,6 +12,7 @@ import BeforeAfter from "@/components/BeforeAfter";
 import AvailabilityPanel from "@/components/AvailabilityPanel";
 import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
 import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
+import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
 
 type ProductCandidate = { imageUrl: string; title: string; sourceDomain: string; score: number };
 
@@ -19,6 +20,7 @@ export default function TryOn() {
   const { user } = useAuth();
   const { history, add: addHistory, remove: removeHistory, clear: clearHistory } = useTryOnHistory(user?.id);
   const [showAvailability, setShowAvailability] = useState(false);
+  const [basicPreviewCount, setBasicPreviewCount] = useState(() => getDailyBasicPreviewCount(user?.id));
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -39,6 +41,10 @@ export default function TryOn() {
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
+
+  useEffect(() => {
+    setBasicPreviewCount(getDailyBasicPreviewCount(user?.id));
+  }, [user?.id]);
 
   // Product-match confirmation
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -319,6 +325,27 @@ export default function TryOn() {
     runGeneration({ imageUrl: c.imageUrl, label: pendingLabel || c.title });
   };
 
+  const runBasicPreview = () => {
+    if (!user) return toast.error("Please sign in to use Basic Preview.");
+    if (!photoPreview) return toast.error("Add your photo first.");
+
+    const directImageUrl = extractedProductUrl && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(extractedProductUrl)
+      ? extractedProductUrl
+      : null;
+    const garmentUrl = itemDataUrl ?? itemPreview ?? directImageUrl;
+    if (!garmentUrl) return toast.error("For a free Basic Preview, upload a product photo or paste a direct image link.");
+
+    const usage = useDailyBasicPreview(user.id);
+    setBasicPreviewCount(usage.count);
+    if (!usage.allowed) {
+      return toast.error("You’ve used all 5 free Basic Previews for today on this device.");
+    }
+
+    resetResult();
+    setBasicPreview({ garmentUrl, reason: "NO_AI" });
+    toast.success("Basic Preview ready — no AI or paid service used.");
+  };
+
   // Kept as an alias so existing button handlers work.
   const generate = startGenerate;
 
@@ -402,6 +429,11 @@ export default function TryOn() {
   const canGenerateProductInput = productInput.length > 0 && validateProductInput(productInput) === null;
   const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateProductInput) && !generating;
   const canGenerateFromLink = !!photoFile && canGenerateProductInput && !generating;
+  const directProductImageUrl = extractedProductUrl && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(extractedProductUrl)
+    ? extractedProductUrl
+    : null;
+  const canBasicPreview = !!photoFile && (!!itemDataUrl || !!itemPreview || !!directProductImageUrl);
+  const basicPreviewRemaining = Math.max(0, BASIC_PREVIEW_DAILY_LIMIT - basicPreviewCount);
 
   return (
     <div className="container max-w-3xl py-10">
@@ -597,6 +629,19 @@ export default function TryOn() {
 
       {/* Single unified generate action — shows whenever a garment upload is present
           (the paste card has its own button for the URL/name flow). */}
+      {canBasicPreview && !generating && !resolving && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={runBasicPreview}
+          disabled={!user || basicPreviewRemaining === 0}
+          className="w-full mb-3 h-12"
+        >
+          <ImageIcon className="w-4 h-4" /> Basic Preview (Free, no AI)
+          <span className="ml-auto text-xs text-muted-foreground">{basicPreviewRemaining}/5 today</span>
+        </Button>
+      )}
+
       {itemDataUrl && !generating && !resolving && (
         <Button
           onClick={generate}
@@ -620,24 +665,18 @@ export default function TryOn() {
             <h2 className="font-display text-xl font-medium">You + this item</h2>
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            This is not a realistic AI try-on — it shows your photo next to the product so you can judge the look.
-            {basicPreview.reason === "RATE_LIMITED" ? " Realistic AI try-on is busy right now; please try again in a minute." : " Realistic AI try-on is currently unavailable."}
+            This is not a realistic AI try-on. It places your photo beside the product photo; it does not change the clothes in your image.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
-              <img src={photoPreview} alt="Your photo" className="w-full aspect-[4/5] object-cover" />
-              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">You</figcaption>
-            </figure>
-            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
-              {basicPreview.garmentUrl
-                ? <img src={basicPreview.garmentUrl} alt="Product" className="w-full aspect-[4/5] object-contain bg-muted" />
-                : <div className="w-full aspect-[4/5] grid place-items-center text-xs text-muted-foreground">No product image</div>}
-              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">Product{detected?.label ? ` · ${detected.label}` : ""}</figcaption>
-            </figure>
+            <PhotoFigure src={photoPreview} alt="Your photo" caption="Before · Your photo" />
+            <PhotoFigure src={basicPreview.garmentUrl} alt="Product photo" caption="Product photo" contain />
           </div>
-          <Button variant="outline" className="mt-4 w-full" onClick={generate} disabled={generating}>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            {basicPreviewRemaining} free previews left today on this device. This count is stored in your browser and can be reset or bypassed on another device.
+          </p>
+          {itemDataUrl && <Button variant="outline" className="mt-4 w-full" onClick={generate} disabled={generating}>
             <Sparkles className="w-4 h-4" /> Try realistic AI try-on again
-          </Button>
+          </Button>}
         </motion.div>
       )}
 
@@ -646,14 +685,8 @@ export default function TryOn() {
           <h2 className="font-display text-2xl font-medium mb-4">Before / After</h2>
 
           <div className="grid grid-cols-2 gap-3 mb-5">
-            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
-              <img src={photoPreview} alt="Before" className="w-full aspect-[4/5] object-cover" />
-              <figcaption className="text-[11px] uppercase tracking-widest text-muted-foreground px-3 py-2">Before</figcaption>
-            </figure>
-            <figure className="rounded-2xl overflow-hidden border border-border bg-background">
-              <img src={resultUrl} alt="After" className="w-full aspect-[4/5] object-cover" />
-              <figcaption className="text-[11px] uppercase tracking-widest text-accent px-3 py-2">After{detected?.label ? ` · ${detected.label}` : ""}</figcaption>
-            </figure>
+            <PhotoFigure src={photoPreview} alt="Before" caption="Before" />
+            <PhotoFigure src={resultUrl} alt="After" caption={`After${detected?.label ? ` · ${detected.label}` : ""}`} />
           </div>
 
           <div className="text-xs text-muted-foreground mb-2">Drag the slider to compare</div>
