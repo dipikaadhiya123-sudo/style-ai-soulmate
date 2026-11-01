@@ -900,3 +900,14 @@ function UploadTile({
     </div>
   );
 }
+
+function PhotoFigure({ src, alt, caption, contain = false }: { src: string; alt: string; caption: string; contain?: boolean }) {
+  return (
+    <figure className="rounded-xl overflow-hidden border border-border bg-muted">
+      <div className="aspect-[3/4] w-full">
+        <img src={src} alt={alt} loading="lazy" className={`w-full h-full ${contain ? "object-contain" : "object-cover"}`} />
+      </div>
+      <figcaption className="px-2 py-1.5 text-[11px] text-muted-foreground text-center">{caption}</figcaption>
+    </figure>
+  );
+}
