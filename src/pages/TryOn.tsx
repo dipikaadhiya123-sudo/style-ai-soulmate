@@ -760,6 +760,11 @@ export default function TryOn() {
             <Button variant="outline" onClick={() => setShowAvailability((s) => !s)}>
               <Store className="w-4 h-4" /> {showAvailability ? "Hide stores" : "Find in stores"}
             </Button>
+            {basicPreview && (itemDataUrl || canGenerateFromLink) && (
+              <Button variant="outline" onClick={generate} disabled={generating}>
+                <Sparkles className="w-4 h-4" /> Try realistic AI try-on again
+              </Button>
+            )}
           </div>
 
           {showAvailability && detected?.label && (
