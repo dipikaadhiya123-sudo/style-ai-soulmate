@@ -356,7 +356,7 @@ export default function TryOn() {
     }
   };
 
-  const runBasicPreview = () => {
+  const runBasicPreview = async () => {
     if (!user) return toast.error("Please sign in to use Basic Preview.");
     if (!photoPreview) return toast.error("Add your photo first.");
 
