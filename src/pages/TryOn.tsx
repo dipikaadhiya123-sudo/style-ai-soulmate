@@ -375,6 +375,7 @@ export default function TryOn() {
     resetResult();
     setBasicPreview({ garmentUrl, reason: "NO_AI" });
     toast.success("Basic Preview ready — no AI or paid service used.");
+    await showComposedPreview(garmentUrl, "NO_AI");
   };
 
   // Kept as an alias so existing button handlers work.
@@ -398,7 +399,7 @@ export default function TryOn() {
           item_image_url: null,
           item_label: label,
           category: uiCat,
-          description: `AI-rendered ${cat}: ${label}`,
+          description: basicPreview ? `Basic Preview (no AI): ${label}` : `AI-rendered ${cat}: ${label}`,
           highlights: [],
           result_image_path: resultPath,
         })
