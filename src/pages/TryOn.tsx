@@ -690,7 +690,7 @@ export default function TryOn() {
       )}
 
 
-      {basicPreview && photoPreview && (
+      {basicPreview && photoPreview && !resultUrl && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[11px] uppercase tracking-widest rounded-full border border-border px-2 py-0.5 text-muted-foreground">Basic Preview</span>
@@ -714,7 +714,20 @@ export default function TryOn() {
 
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="font-display text-2xl font-medium mb-4">Before / After</h2>
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <h2 className="font-display text-2xl font-medium">Before / After</h2>
+            {basicPreview && (
+              <span className="text-[11px] uppercase tracking-widest rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                Basic Preview — free, no AI
+              </span>
+            )}
+          </div>
+          {basicPreview && (
+            <p className="text-xs text-muted-foreground mb-4">
+              {basicPreviewReasonCopy(basicPreview.reason)} This is not a realistic AI try-on — your photo and the
+              product photo are shown together; the clothes in your image were not changed.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3 mb-5">
             <PhotoFigure src={photoPreview} alt="Before" caption="Before" />
