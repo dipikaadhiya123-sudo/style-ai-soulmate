@@ -13,6 +13,7 @@ import AvailabilityPanel from "@/components/AvailabilityPanel";
 import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
 import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
 import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
+import { composeBasicPreviewImage, basicPreviewReasonCopy } from "@/lib/basicPreviewImage";
 
 type ProductCandidate = { imageUrl: string; title: string; sourceDomain: string; score: number };
 
@@ -284,8 +285,10 @@ export default function TryOn() {
       if (data?.error) throw new Error(data.error);
 
       if (data?.basicPreview) {
-        setBasicPreview({ garmentUrl: data.garmentUrl ?? chosen.imageUrl ?? itemPreview, reason: data.reason });
-        toast.message("Realistic AI try-on is busy — showing a free Basic Preview");
+        const garment = data.garmentUrl ?? chosen.imageUrl ?? itemPreview ?? null;
+        setBasicPreview({ garmentUrl: garment, reason: data.reason });
+        toast.message("Realistic AI try-on is busy — made a free Basic Preview instead");
+        await showComposedPreview(garment, data.reason, chosen.label);
         return;
       }
 
@@ -323,6 +326,34 @@ export default function TryOn() {
     if (!c) return;
     setConfirmOpen(false);
     runGeneration({ imageUrl: c.imageUrl, label: pendingLabel || c.title });
+  };
+
+  // Real-time fallback image: composes "your photo + product photo" on a local
+  // canvas (no AI, no bill), uploads it so it can be saved and shared like a
+  // normal result. Falls back silently to the labeled card if composition fails.
+  const showComposedPreview = async (garmentUrl: string | null, reason: string, label?: string) => {
+    if (!user || !photoPreview || !garmentUrl) return;
+    try {
+      const composed = await composeBasicPreviewImage(photoPreview, garmentUrl, reason);
+      if (!composed) return;
+      const path = `${user.id}/basic-${Date.now()}.jpg`;
+      const { error } = await supabase.storage
+        .from("tryon-results")
+        .upload(path, composed.blob, { contentType: "image/jpeg", upsert: true });
+      if (!error) setResultPath(path);
+      setResultUrl(composed.dataUrl);
+      try {
+        const beforeDataUrl = await fileToDataUrl(photoFile!);
+        addHistory({
+          beforeUrl: beforeDataUrl,
+          afterUrl: composed.dataUrl,
+          label: label ?? "Basic Preview (no AI)",
+          sourceUrl: extractedProductUrl ?? undefined,
+        });
+      } catch { /* history is optional */ }
+    } catch (e) {
+      console.warn("Basic preview image failed — showing labeled card only", e);
+    }
   };
 
   const runBasicPreview = () => {
