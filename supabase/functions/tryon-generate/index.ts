@@ -365,7 +365,7 @@ Deno.serve(withCors(async (req) => {
     // Fallback / footwear / accessory path → Gemini image editing
     if (!bytes) {
       console.log("using gemini model", geminiModel, "for category", primary.category);
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const callGemini = () => fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -374,6 +374,20 @@ Deno.serve(withCors(async (req) => {
           modalities: ["image", "text"],
         }),
       });
+
+      let aiResp = await callGemini();
+
+      // Rate limited → one bounded retry honoring Retry-After (capped at 3s)
+      // so a transient burst doesn't fail the user. Still 429 → Basic Preview.
+      if (aiResp.status === 429) {
+        const retryAfter = Number(aiResp.headers.get("retry-after"));
+        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 3000)
+          : 2000;
+        console.log(`rate limited; retrying once after ${waitMs}ms`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        aiResp = await callGemini();
+      }
 
       if (aiResp.status === 429) return basicPreview("RATE_LIMITED");
       if (aiResp.status === 402) return basicPreview("CREDITS_EXHAUSTED");

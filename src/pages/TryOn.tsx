@@ -13,6 +13,7 @@ import AvailabilityPanel from "@/components/AvailabilityPanel";
 import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
 import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
 import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
+import { composeBasicPreviewImage, basicPreviewReasonCopy } from "@/lib/basicPreviewImage";
 
 type ProductCandidate = { imageUrl: string; title: string; sourceDomain: string; score: number };
 
@@ -284,8 +285,10 @@ export default function TryOn() {
       if (data?.error) throw new Error(data.error);
 
       if (data?.basicPreview) {
-        setBasicPreview({ garmentUrl: data.garmentUrl ?? chosen.imageUrl ?? itemPreview, reason: data.reason });
-        toast.message("Realistic AI try-on is busy — showing a free Basic Preview");
+        const garment = data.garmentUrl ?? chosen.imageUrl ?? itemPreview ?? null;
+        setBasicPreview({ garmentUrl: garment, reason: data.reason });
+        toast.message("Realistic AI try-on is busy — made a free Basic Preview instead");
+        await showComposedPreview(garment, data.reason, chosen.label);
         return;
       }
 
@@ -325,7 +328,35 @@ export default function TryOn() {
     runGeneration({ imageUrl: c.imageUrl, label: pendingLabel || c.title });
   };
 
-  const runBasicPreview = () => {
+  // Real-time fallback image: composes "your photo + product photo" on a local
+  // canvas (no AI, no bill), uploads it so it can be saved and shared like a
+  // normal result. Falls back silently to the labeled card if composition fails.
+  const showComposedPreview = async (garmentUrl: string | null, reason: string, label?: string) => {
+    if (!user || !photoPreview || !garmentUrl) return;
+    try {
+      const composed = await composeBasicPreviewImage(photoPreview, garmentUrl, reason);
+      if (!composed) return;
+      const path = `${user.id}/basic-${Date.now()}.jpg`;
+      const { error } = await supabase.storage
+        .from("tryon-results")
+        .upload(path, composed.blob, { contentType: "image/jpeg", upsert: true });
+      if (!error) setResultPath(path);
+      setResultUrl(composed.dataUrl);
+      try {
+        const beforeDataUrl = await fileToDataUrl(photoFile!);
+        addHistory({
+          beforeUrl: beforeDataUrl,
+          afterUrl: composed.dataUrl,
+          label: label ?? "Basic Preview (no AI)",
+          sourceUrl: extractedProductUrl ?? undefined,
+        });
+      } catch { /* history is optional */ }
+    } catch (e) {
+      console.warn("Basic preview image failed — showing labeled card only", e);
+    }
+  };
+
+  const runBasicPreview = async () => {
     if (!user) return toast.error("Please sign in to use Basic Preview.");
     if (!photoPreview) return toast.error("Add your photo first.");
 
@@ -344,6 +375,7 @@ export default function TryOn() {
     resetResult();
     setBasicPreview({ garmentUrl, reason: "NO_AI" });
     toast.success("Basic Preview ready — no AI or paid service used.");
+    await showComposedPreview(garmentUrl, "NO_AI");
   };
 
   // Kept as an alias so existing button handlers work.
@@ -367,7 +399,7 @@ export default function TryOn() {
           item_image_url: null,
           item_label: label,
           category: uiCat,
-          description: `AI-rendered ${cat}: ${label}`,
+          description: basicPreview ? `Basic Preview (no AI): ${label}` : `AI-rendered ${cat}: ${label}`,
           highlights: [],
           result_image_path: resultPath,
         })
@@ -658,7 +690,7 @@ export default function TryOn() {
       )}
 
 
-      {basicPreview && photoPreview && (
+      {basicPreview && photoPreview && !resultUrl && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[11px] uppercase tracking-widest rounded-full border border-border px-2 py-0.5 text-muted-foreground">Basic Preview</span>
@@ -682,7 +714,20 @@ export default function TryOn() {
 
       {resultUrl && photoPreview && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="font-display text-2xl font-medium mb-4">Before / After</h2>
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <h2 className="font-display text-2xl font-medium">Before / After</h2>
+            {basicPreview && (
+              <span className="text-[11px] uppercase tracking-widest rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                Basic Preview — free, no AI
+              </span>
+            )}
+          </div>
+          {basicPreview && (
+            <p className="text-xs text-muted-foreground mb-4">
+              {basicPreviewReasonCopy(basicPreview.reason)} This is not a realistic AI try-on — your photo and the
+              product photo are shown together; the clothes in your image were not changed.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3 mb-5">
             <PhotoFigure src={photoPreview} alt="Before" caption="Before" />
@@ -715,6 +760,11 @@ export default function TryOn() {
             <Button variant="outline" onClick={() => setShowAvailability((s) => !s)}>
               <Store className="w-4 h-4" /> {showAvailability ? "Hide stores" : "Find in stores"}
             </Button>
+            {basicPreview && (itemDataUrl || canGenerateFromLink) && (
+              <Button variant="outline" onClick={generate} disabled={generating}>
+                <Sparkles className="w-4 h-4" /> Try realistic AI try-on again
+              </Button>
+            )}
           </div>
 
           {showAvailability && detected?.label && (
