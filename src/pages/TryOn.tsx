@@ -131,7 +131,7 @@ export default function TryOn() {
     setUrlStatus("idle");
     if (value) {
       setItemFile(null);
-      setItemPreview(null);
+      setItemPreviewUrl(null);
       setItemDataUrl(null);
     }
     resetResult();
@@ -181,13 +181,13 @@ export default function TryOn() {
 
   const onPhoto = (file: File) => {
     setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoPreviewUrl(URL.createObjectURL(file));
     resetResult();
   };
 
   const onItem = (file: File) => {
     setItemFile(file);
-    setItemPreview(URL.createObjectURL(file));
+    setItemPreviewUrl(URL.createObjectURL(file));
     setProductUrl("");
     setUrlError(null);
     setUrlStatus("idle");
@@ -505,7 +505,7 @@ export default function TryOn() {
           label="Your photo"
           preview={photoPreview}
           placeholder="Tap to add"
-          onClear={() => { setPhotoFile(null); setPhotoPreview(null); resetResult(); }}
+          onClear={() => { setPhotoFile(null); setPhotoPreviewUrl(null); resetResult(); }}
           onPick={() => photoInput.current?.click()}
           onCamera={() => cameraInput.current?.click()}
         />
@@ -513,7 +513,7 @@ export default function TryOn() {
           label="Product photo"
           preview={itemPreview}
           placeholder="Tap to add"
-          onClear={() => { setItemFile(null); setItemPreview(null); setItemDataUrl(null); resetResult(); }}
+          onClear={() => { setItemFile(null); setItemPreviewUrl(null); setItemDataUrl(null); resetResult(); }}
           onPick={() => itemInput.current?.click()}
         />
       </div>
