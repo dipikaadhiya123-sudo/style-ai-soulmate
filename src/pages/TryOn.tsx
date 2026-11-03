@@ -131,7 +131,7 @@ export default function TryOn() {
     setUrlStatus("idle");
     if (value) {
       setItemFile(null);
-      setItemPreview(null);
+      setItemPreviewUrl(null);
       setItemDataUrl(null);
     }
     resetResult();
@@ -146,11 +146,30 @@ export default function TryOn() {
   const cameraInput = useRef<HTMLInputElement>(null);
   const itemInput = useRef<HTMLInputElement>(null);
 
+  // Track object URLs outside state so replacing one photo never revokes the
+  // other's live preview (the shared-deps cleanup effect used to do exactly
+  // that — it killed the "Before" image whenever a product photo was added).
+  const objectUrlsRef = useRef<{ photo: string | null; item: string | null }>({ photo: null, item: null });
+
+  const setPhotoPreviewUrl = useCallback((url: string | null) => {
+    const prev = objectUrlsRef.current.photo;
+    if (prev && prev !== url && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+    objectUrlsRef.current.photo = url;
+    setPhotoPreview(url);
+  }, []);
+
+  const setItemPreviewUrl = useCallback((url: string | null) => {
+    const prev = objectUrlsRef.current.item;
+    if (prev && prev !== url && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+    objectUrlsRef.current.item = url;
+    setItemPreview(url);
+  }, []);
+
   useEffect(() => () => {
-    if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
-    if (itemPreview?.startsWith("blob:")) URL.revokeObjectURL(itemPreview);
+    if (objectUrlsRef.current.photo?.startsWith("blob:")) URL.revokeObjectURL(objectUrlsRef.current.photo);
+    if (objectUrlsRef.current.item?.startsWith("blob:")) URL.revokeObjectURL(objectUrlsRef.current.item);
     if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
-  }, [photoPreview, itemPreview]);
+  }, []);
 
   const resetResult = () => {
     setBasicPreview(null);
@@ -162,13 +181,13 @@ export default function TryOn() {
 
   const onPhoto = (file: File) => {
     setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoPreviewUrl(URL.createObjectURL(file));
     resetResult();
   };
 
   const onItem = (file: File) => {
     setItemFile(file);
-    setItemPreview(URL.createObjectURL(file));
+    setItemPreviewUrl(URL.createObjectURL(file));
     setProductUrl("");
     setUrlError(null);
     setUrlStatus("idle");
@@ -420,7 +439,7 @@ export default function TryOn() {
   const restoreFromHistory = (id: string) => {
     const entry = history.find((h) => h.id === id);
     if (!entry) return;
-    setPhotoPreview(entry.beforeUrl);
+    setPhotoPreviewUrl(entry.beforeUrl);
     setResultUrl(entry.afterUrl);
     setResultPath(null); // can't re-save; only view
     setSavedSlug(null);
@@ -486,7 +505,7 @@ export default function TryOn() {
           label="Your photo"
           preview={photoPreview}
           placeholder="Tap to add"
-          onClear={() => { setPhotoFile(null); setPhotoPreview(null); resetResult(); }}
+          onClear={() => { setPhotoFile(null); setPhotoPreviewUrl(null); resetResult(); }}
           onPick={() => photoInput.current?.click()}
           onCamera={() => cameraInput.current?.click()}
         />
@@ -494,7 +513,7 @@ export default function TryOn() {
           label="Product photo"
           preview={itemPreview}
           placeholder="Tap to add"
-          onClear={() => { setItemFile(null); setItemPreview(null); setItemDataUrl(null); resetResult(); }}
+          onClear={() => { setItemFile(null); setItemPreviewUrl(null); setItemDataUrl(null); resetResult(); }}
           onPick={() => itemInput.current?.click()}
         />
       </div>
