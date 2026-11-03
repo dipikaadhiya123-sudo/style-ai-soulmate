@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">style-ai-soulmate</string>
+    <string name="title_activity_main">style-ai-soulmate</string>
+    <string name="package_name">app.lovable.b602538948654bebb8a82a3e146103a8</string>
+    <string name="custom_url_scheme">app.lovable.b602538948654bebb8a82a3e146103a8</string>
+</resources>
