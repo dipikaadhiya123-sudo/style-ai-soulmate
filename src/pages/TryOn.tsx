@@ -439,7 +439,7 @@ export default function TryOn() {
   const restoreFromHistory = (id: string) => {
     const entry = history.find((h) => h.id === id);
     if (!entry) return;
-    setPhotoPreview(entry.beforeUrl);
+    setPhotoPreviewUrl(entry.beforeUrl);
     setResultUrl(entry.afterUrl);
     setResultPath(null); // can't re-save; only view
     setSavedSlug(null);
