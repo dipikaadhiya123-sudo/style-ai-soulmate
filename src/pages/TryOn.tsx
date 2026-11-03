@@ -146,11 +146,30 @@ export default function TryOn() {
   const cameraInput = useRef<HTMLInputElement>(null);
   const itemInput = useRef<HTMLInputElement>(null);
 
+  // Track object URLs outside state so replacing one photo never revokes the
+  // other's live preview (the shared-deps cleanup effect used to do exactly
+  // that — it killed the "Before" image whenever a product photo was added).
+  const objectUrlsRef = useRef<{ photo: string | null; item: string | null }>({ photo: null, item: null });
+
+  const setPhotoPreviewUrl = useCallback((url: string | null) => {
+    const prev = objectUrlsRef.current.photo;
+    if (prev && prev !== url && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+    objectUrlsRef.current.photo = url;
+    setPhotoPreview(url);
+  }, []);
+
+  const setItemPreviewUrl = useCallback((url: string | null) => {
+    const prev = objectUrlsRef.current.item;
+    if (prev && prev !== url && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+    objectUrlsRef.current.item = url;
+    setItemPreview(url);
+  }, []);
+
   useEffect(() => () => {
-    if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
-    if (itemPreview?.startsWith("blob:")) URL.revokeObjectURL(itemPreview);
+    if (objectUrlsRef.current.photo?.startsWith("blob:")) URL.revokeObjectURL(objectUrlsRef.current.photo);
+    if (objectUrlsRef.current.item?.startsWith("blob:")) URL.revokeObjectURL(objectUrlsRef.current.item);
     if (urlTimeoutRef.current) clearTimeout(urlTimeoutRef.current);
-  }, [photoPreview, itemPreview]);
+  }, []);
 
   const resetResult = () => {
     setBasicPreview(null);
