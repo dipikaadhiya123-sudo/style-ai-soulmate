@@ -5,3 +5,4 @@
 - [x] Diagnose the uploaded StyleAI source and implement the user's zero-cost preference — code inspection found AI inference and product lookup depend on metered services; clarify whether “free” means free for app users or no AI/API spend at all before disabling or redesigning those features.
 - [x] Build signed Android APK/AAB from the Capacitor scaffold for Play Store deploy (styleai-soulmate-release.apk/.aab, signed with android/styleai-release.keystore).
 - [ ] Set Vercel backend variables, redeploy, and verify live home/login/try-on — blocked because no Vercel connection or deployment credential is available in this workspace.
+- [ ] Implement and verify Android Google sign-in, then build a new signed APK — blocked because the installed managed-auth package has no documented native browser/deep-link callback contract, and this build environment has no Java/Android SDK or attached device/emulator.
