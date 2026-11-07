@@ -1,3 +1,4 @@
+- [x] Unlock realistic AI try-on after five daily Basic Previews and show the prior fallback beside a successful AI result; clarify metered AI costs.
 - [x] Apply consistent CORS handling to all Supabase Edge Functions and redeploy them.
 - [x] Verify deployed responses include the requested CORS headers and report any deployment/test blocker.
 - [ ] Identify the user's GitHub-connected StyleAI Soulmate project and the “StyleAI 2026” backend/project — blocked because workspace search only found StyleAI Avatar; need the intended repository/project link.
