@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
+import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, isRealAiTryOnUnlocked, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
 
 function createMemoryStorage() {
   const values = new Map<string, string>();
@@ -25,5 +25,10 @@ describe("device-local Basic Preview daily limit", () => {
     expect(blocked.allowed).toBe(false);
     expect(blocked.count).toBe(5);
     expect(getDailyBasicPreviewCount("user-123", storage, date)).toBe(5);
+  });
+
+  it("unlocks realistic AI only after all five free previews are used", () => {
+    expect(isRealAiTryOnUnlocked(4)).toBe(false);
+    expect(isRealAiTryOnUnlocked(5)).toBe(true);
   });
 });

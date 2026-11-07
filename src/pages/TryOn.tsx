@@ -12,7 +12,7 @@ import BeforeAfter from "@/components/BeforeAfter";
 import AvailabilityPanel from "@/components/AvailabilityPanel";
 import RetailerFallback, { retailerList } from "@/components/RetailerFallback";
 import { useTryOnHistory, fileToDataUrl } from "@/hooks/useTryOnHistory";
-import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
+import { BASIC_PREVIEW_DAILY_LIMIT, getDailyBasicPreviewCount, isRealAiTryOnUnlocked, useDailyBasicPreview } from "@/lib/basicPreviewUsage";
 import { composeBasicPreviewImage, basicPreviewReasonCopy } from "@/lib/basicPreviewImage";
 
 type ProductCandidate = { imageUrl: string; title: string; sourceDomain: string; score: number };
@@ -39,6 +39,7 @@ export default function TryOn() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultPath, setResultPath] = useState<string | null>(null);
   const [basicPreview, setBasicPreview] = useState<{ garmentUrl: string | null; reason: string } | null>(null);
+  const [basicFallbackUrl, setBasicFallbackUrl] = useState<string | null>(null);
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ label: string; category: string } | null>(null);
@@ -173,6 +174,7 @@ export default function TryOn() {
 
   const resetResult = () => {
     setBasicPreview(null);
+    setBasicFallbackUrl(null);
     setResultUrl(null);
     setResultPath(null);
     setSavedSlug(null);
@@ -217,6 +219,9 @@ export default function TryOn() {
   // user confirm the correct garment before spending an AI generation credit.
   const startGenerate = async () => {
     if (!user) return toast.error("Please sign in.");
+    if (!isRealAiTryOnUnlocked(basicPreviewCount)) {
+      return toast.message("Use all 5 free Basic Previews today to unlock realistic AI try-on.");
+    }
     if (!photoFile) return toast.error("Add your photo.");
     const productInput = productUrl.trim();
     const url = extractHttpUrl(productInput);
@@ -280,8 +285,14 @@ export default function TryOn() {
 
   const runGeneration = async (chosen: { imageUrl: string; label?: string }) => {
     if (!user || !photoFile) return;
+    if (!isRealAiTryOnUnlocked(basicPreviewCount)) {
+      return toast.message("Use all 5 free Basic Previews today to unlock realistic AI try-on.");
+    }
     setGenerating(true);
-    resetResult();
+    setResultUrl(null);
+    setResultPath(null);
+    setSavedSlug(null);
+    setDetected(null);
     try {
       const ext = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `${user.id}/tryon-${Date.now()}.${ext}`;
@@ -313,6 +324,7 @@ export default function TryOn() {
 
       setResultUrl(data.resultUrl);
       setResultPath(data.resultPath);
+      setBasicPreview(null);
       const det = data?.detected?.[0];
       if (det) setDetected(det);
 
@@ -361,6 +373,7 @@ export default function TryOn() {
         .upload(path, composed.blob, { contentType: "image/jpeg", upsert: true });
       if (!error) setResultPath(path);
       setResultUrl(composed.dataUrl);
+      setBasicFallbackUrl(composed.dataUrl);
       try {
         const beforeDataUrl = await fileToDataUrl(photoFile!);
         addHistory({
@@ -478,8 +491,9 @@ export default function TryOn() {
   const productInput = productUrl.trim();
   const extractedProductUrl = extractHttpUrl(productInput);
   const canGenerateProductInput = productInput.length > 0 && validateProductInput(productInput) === null;
-  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateProductInput) && !generating;
-  const canGenerateFromLink = !!photoFile && canGenerateProductInput && !generating;
+  const canUseRealTryOn = isRealAiTryOnUnlocked(basicPreviewCount);
+  const canGenerate = !!photoFile && (!!itemDataUrl || canGenerateProductInput) && !generating && canUseRealTryOn;
+  const canGenerateFromLink = !!photoFile && canGenerateProductInput && !generating && canUseRealTryOn;
   const directProductImageUrl = extractedProductUrl && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(extractedProductUrl)
     ? extractedProductUrl
     : null;
@@ -621,6 +635,11 @@ export default function TryOn() {
                   : <><Sparkles className="w-4 h-4" /> Find product & try on</>}
           </Button>
         )}
+        {canGenerateProductInput && !canUseRealTryOn && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Use all 5 free Basic Previews today to unlock realistic AI try-on. The daily count is stored on this device.
+          </p>
+        )}
       </div>
 
 
@@ -693,6 +712,12 @@ export default function TryOn() {
         </Button>
       )}
 
+      <p className="text-xs text-muted-foreground mb-6">
+        {canUseRealTryOn
+          ? "Realistic AI try-on is unlocked. It uses metered AI services and may create costs for the app owner; no customer checkout is configured."
+          : `Use ${BASIC_PREVIEW_DAILY_LIMIT - basicPreviewCount} more free Basic Preview${BASIC_PREVIEW_DAILY_LIMIT - basicPreviewCount === 1 ? "" : "s"} today to unlock realistic AI try-on.`}
+      </p>
+
       {itemDataUrl && !generating && !resolving && (
         <Button
           onClick={generate}
@@ -704,7 +729,9 @@ export default function TryOn() {
             ? <><Loader2 className="w-5 h-5 animate-spin" /> Rendering your try-on…</>
             : !photoFile
               ? <><Sparkles className="w-5 h-5" /> Add your photo to generate</>
-              : <><Sparkles className="w-5 h-5" /> Generate try-on</>}
+              : !canUseRealTryOn
+                ? <><Sparkles className="w-5 h-5" /> Unlock after 5 free previews</>
+                : <><Sparkles className="w-5 h-5" /> Generate realistic AI try-on</>}
         </Button>
       )}
 
@@ -748,10 +775,18 @@ export default function TryOn() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className={cn("grid gap-3 mb-5", basicFallbackUrl && resultUrl !== basicFallbackUrl ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
             <PhotoFigure src={photoPreview} alt="Before" caption="Before" />
-            <PhotoFigure src={resultUrl} alt="After" caption={`After${detected?.label ? ` · ${detected.label}` : ""}`} />
+            <PhotoFigure src={resultUrl} alt={basicPreview ? "Basic Preview" : "Real AI try-on result"} caption={basicPreview ? "Basic Preview · not realistic AI" : `Real AI try-on${detected?.label ? ` · ${detected.label}` : ""}`} />
+            {basicFallbackUrl && resultUrl !== basicFallbackUrl && (
+              <PhotoFigure src={basicFallbackUrl} alt="Basic Preview fallback" caption="Basic Preview fallback · not realistic AI" />
+            )}
           </div>
+          {basicFallbackUrl && resultUrl !== basicFallbackUrl && (
+            <p className="text-xs text-muted-foreground mb-4">
+              Both results are shown: the realistic AI image and your earlier Basic Preview. The Basic Preview only places your photo beside the product; it does not change your clothes.
+            </p>
+          )}
 
           <div className="text-xs text-muted-foreground mb-2">Drag the slider to compare</div>
           <BeforeAfter beforeUrl={photoPreview} afterUrl={resultUrl} itemLabel={detected?.label ?? ""} />

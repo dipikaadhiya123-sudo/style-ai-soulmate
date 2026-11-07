@@ -1,5 +1,10 @@
 export const BASIC_PREVIEW_DAILY_LIMIT = 5;
 
+export function isRealAiTryOnUnlocked(basicPreviewCount: number) {
+  return Number.isFinite(basicPreviewCount)
+    && Math.floor(basicPreviewCount) >= BASIC_PREVIEW_DAILY_LIMIT;
+}
+
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 function dateKey(date: Date) {
